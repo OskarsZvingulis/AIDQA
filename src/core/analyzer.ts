@@ -84,7 +84,7 @@ export function analyzeDesign(root: DesignNode, system: DesignSystem): AnalyzeRe
         const nearest = findNearestNumber(node.borderRadius, system.radiusScale);
         issues.push({
           id: `issue-${issueCounter++}`,
-          type: 'spacing',
+          type: 'radius',
           nodeId: node.id,
           nodeName: node.name,
           description: `Border radius ${node.borderRadius}px is off-token.`,
@@ -218,6 +218,7 @@ export function analyzeDesign(root: DesignNode, system: DesignSystem): AnalyzeRe
   // Count by type
   const byType: Record<IssueType, number> = {
     spacing: 0,
+    radius: 0,
     color: 0,
     text: 0,
     component: 0,

@@ -1,4 +1,4 @@
-# AI Design Check (AIDQA)
+# Brand Fitting (AIDQA)
 
 An automated design quality assurance tool that scans design files for inconsistencies in design systems, brand standards, and accessibility.
 
@@ -6,7 +6,7 @@ An automated design quality assurance tool that scans design files for inconsist
 
 **Problem**: Design teams waste 20-30% of their time fixing inconsistencies in spacing, colors, typography, and components. Handoffs to developers are messy, and enterprises lose thousands per week on preventable design errors.
 
-**Solution**: AI Design Check automatically analyzes design trees against design system rules and returns a list of issues with actionable suggestions.
+**Solution**: Brand Fitting automatically analyzes design trees against design system rules and returns a list of issues with actionable suggestions.
 
 Note: This project ships with a default design system configuration called **NorthStar Dashboard**. In the demo web UI you can edit the full design system JSON (left panel) to simulate different token sets.
 

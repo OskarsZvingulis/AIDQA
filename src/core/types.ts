@@ -66,7 +66,8 @@ export type IssueType =
   | 'color'
   | 'text'
   | 'component'
-  | 'accessibility';
+  | 'accessibility'
+  | 'radius';
 
 export type Issue = {
   id: string;

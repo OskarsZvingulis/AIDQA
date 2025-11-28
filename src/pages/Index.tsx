@@ -64,7 +64,7 @@ export default function Index() {
     <div className="min-h-screen bg-background p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         <header className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight">AI Design Check</h1>
+          <h1 className="text-4xl font-bold tracking-tight">AIDQA</h1>
           <p className="text-muted-foreground">
             Automatically scan design files for inconsistencies in design systems, brand standards, and accessibility.
           </p>
