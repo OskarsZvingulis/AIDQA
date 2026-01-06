@@ -55,6 +55,98 @@ npm install
 npm run dev
 ```
 
+## Visual Regression API (MVP)
+
+This repo is primarily a frontend + core TypeScript analyzer, but it also includes a small Node/Express API for **pixel-perfect visual regression** under `/api/v1/visual`.
+
+### Run the API locally
+
+In one terminal:
+
+```bash
+npm run dev:api
+```
+
+In another terminal (web UI):
+
+```bash
+npm run dev
+```
+
+Notes:
+
+- The API listens on `http://localhost:8787` by default.
+- The Vite dev server proxies `/api/*` and `/storage/*` to the API automatically.
+- Playwright may require installing browsers once:
+
+```bash
+npx playwright install
+```
+
+### Storage layout
+
+Artifacts are stored on local filesystem under:
+
+```
+./storage/visual/{projectId}/{baselineId}/baseline.png
+./storage/visual/{projectId}/{baselineId}/runs/{runId}/current.png
+./storage/visual/{projectId}/{baselineId}/runs/{runId}/diff.png
+./storage/visual/{projectId}/{baselineId}/runs/{runId}/result.json
+```
+
+Artifacts are served (dev/MVP) via:
+
+`GET /storage/visual/...`
+
+### API endpoints
+
+Base path: `/api/v1/visual`
+
+#### (1) Create baseline
+
+```bash
+curl -X POST http://localhost:8787/api/v1/visual/baselines \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectId": "demo",
+    "name": "Example",
+    "url": "https://example.com",
+    "viewport": {"width": 1440, "height": 900}
+  }'
+```
+
+#### (2) Create run (capture current + compare)
+
+```bash
+curl -X POST http://localhost:8787/api/v1/visual/baselines/<BASELINE_ID>/runs \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+#### (3) Get run result
+
+```bash
+curl http://localhost:8787/api/v1/visual/baselines/<BASELINE_ID>/runs/<RUN_ID>
+```
+
+#### (4) List baselines
+
+```bash
+curl "http://localhost:8787/api/v1/visual/baselines?projectId=demo"
+```
+
+#### (5) List runs for a baseline
+
+```bash
+curl http://localhost:8787/api/v1/visual/baselines/<BASELINE_ID>/runs
+```
+
+### Minimal viewer (optional)
+
+If the web UI is running, you can view a run at:
+
+`/visual/baselines/:baselineId/runs/:runId`
+
 ## Example Usage
 
 ### Design System Configuration

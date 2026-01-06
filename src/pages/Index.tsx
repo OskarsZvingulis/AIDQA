@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Link } from 'react-router-dom';
 
 const EXAMPLE_DESIGN_NODE = `{
   "id": "root",
@@ -41,6 +43,91 @@ export default function Index() {
   const [error, setError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
 
+  // Visual regression (MVP) UI state
+  const [visualProjectId, setVisualProjectId] = useState('demo');
+  const [visualName, setVisualName] = useState('Example.com');
+  const [visualUrl, setVisualUrl] = useState('https://example.com');
+  const [visualViewportWidth, setVisualViewportWidth] = useState('1440');
+  const [visualViewportHeight, setVisualViewportHeight] = useState('900');
+  const [visualBaselineId, setVisualBaselineId] = useState<string>('');
+  const [visualRunId, setVisualRunId] = useState<string>('');
+  const [visualStatus, setVisualStatus] = useState<'PASS' | 'FAIL' | 'ERROR' | ''>('');
+  const [visualMismatch, setVisualMismatch] = useState<number | null>(null);
+  const [visualError, setVisualError] = useState<string | null>(null);
+  const [visualLoading, setVisualLoading] = useState(false);
+
+  const parseViewport = () => {
+    const width = Number(visualViewportWidth);
+    const height = Number(visualViewportHeight);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      throw new Error('Viewport must be positive numbers');
+    }
+    return { width: Math.floor(width), height: Math.floor(height) };
+  };
+
+  const handleCreateBaseline = async () => {
+    setVisualError(null);
+    setVisualRunId('');
+    setVisualStatus('');
+    setVisualMismatch(null);
+    setVisualLoading(true);
+    try {
+      const viewport = parseViewport();
+      const res = await fetch('/api/v1/visual/baselines', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          projectId: visualProjectId,
+          name: visualName,
+          url: visualUrl,
+          viewport,
+        }),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      const json = JSON.parse(text) as { baselineId: string };
+      setVisualBaselineId(json.baselineId);
+    } catch (e) {
+      setVisualError(e instanceof Error ? e.message : 'Failed to create baseline');
+    } finally {
+      setVisualLoading(false);
+    }
+  };
+
+  const handleCreateRun = async () => {
+    if (!visualBaselineId) {
+      setVisualError('baselineId is required (create a baseline first)');
+      return;
+    }
+    setVisualError(null);
+    setVisualRunId('');
+    setVisualStatus('');
+    setVisualMismatch(null);
+    setVisualLoading(true);
+    try {
+      const viewport = parseViewport();
+      const res = await fetch(`/api/v1/visual/baselines/${visualBaselineId}/runs`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ viewport }),
+      });
+      const text = await res.text();
+      if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
+      const json = JSON.parse(text) as {
+        runId: string;
+        status: 'PASS' | 'FAIL' | 'ERROR';
+        metrics: { mismatchPixelCount: number };
+      };
+      setVisualRunId(json.runId);
+      setVisualStatus(json.status);
+      setVisualMismatch(json.metrics?.mismatchPixelCount ?? null);
+    } catch (e) {
+      setVisualError(e instanceof Error ? e.message : 'Failed to create run');
+    } finally {
+      setVisualLoading(false);
+    }
+  };
+
   const handleAnalyze = () => {
     setError(null);
     setResult(null);
@@ -69,6 +156,80 @@ export default function Index() {
             Automatically scan design files for inconsistencies in design systems, brand standards, and accessibility.
           </p>
         </header>
+
+        {/* Visual Regression (MVP) */}
+        <Card className="p-6 space-y-4">
+          <div>
+            <h2 className="text-2xl font-semibold">Visual Regression (MVP)</h2>
+            <p className="text-sm text-muted-foreground">
+              Create a baseline screenshot, then run an exact pixel compare.
+            </p>
+          </div>
+
+          {visualError && (
+            <Alert variant="destructive">
+              <AlertDescription>{visualError}</AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="space-y-2 lg:col-span-1">
+              <Label htmlFor="visualProjectId">Project ID</Label>
+              <Input id="visualProjectId" value={visualProjectId} onChange={(e) => setVisualProjectId(e.target.value)} />
+            </div>
+            <div className="space-y-2 lg:col-span-1">
+              <Label htmlFor="visualName">Name</Label>
+              <Input id="visualName" value={visualName} onChange={(e) => setVisualName(e.target.value)} />
+            </div>
+            <div className="space-y-2 lg:col-span-2">
+              <Label htmlFor="visualUrl">URL</Label>
+              <Input id="visualUrl" value={visualUrl} onChange={(e) => setVisualUrl(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="visualViewportWidth">Viewport W</Label>
+              <Input id="visualViewportWidth" value={visualViewportWidth} onChange={(e) => setVisualViewportWidth(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="visualViewportHeight">Viewport H</Label>
+              <Input id="visualViewportHeight" value={visualViewportHeight} onChange={(e) => setVisualViewportHeight(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={handleCreateBaseline} disabled={visualLoading}>
+              Create baseline
+            </Button>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="visualBaselineId">Baseline ID</Label>
+              <Input
+                id="visualBaselineId"
+                value={visualBaselineId}
+                onChange={(e) => setVisualBaselineId(e.target.value)}
+                className="w-[420px] max-w-full font-mono"
+                placeholder="(created baselineId appears here)"
+              />
+            </div>
+            <Button onClick={handleCreateRun} disabled={visualLoading || !visualBaselineId}>
+              Create run
+            </Button>
+          </div>
+
+          {(visualRunId || visualStatus) && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              {visualStatus && (
+                <Badge variant={visualStatus === 'PASS' ? 'default' : visualStatus === 'FAIL' ? 'secondary' : 'destructive'}>
+                  {visualStatus}
+                </Badge>
+              )}
+              {visualMismatch !== null && <span className="text-muted-foreground">mismatchPixelCount: {visualMismatch}</span>}
+              {visualBaselineId && visualRunId && (
+                <Link className="underline" to={`/visual/baselines/${visualBaselineId}/runs/${visualRunId}`}>
+                  Open run viewer
+                </Link>
+              )}
+            </div>
+          )}
+        </Card>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Panel: Design System */}

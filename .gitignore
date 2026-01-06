@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Local artifact storage (visual regression screenshots/results)
+storage/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
