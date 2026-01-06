@@ -77,6 +77,7 @@ Notes:
 
 - The API listens on `http://localhost:8787` by default.
 - The Vite dev server proxies `/api/*` and `/storage/*` to the API automatically.
+- If you deploy the UI as a static site (GitHub Pages / static Vercel), you must deploy the API separately and configure the UI to call it (see below).
 - Playwright may require installing browsers once:
 
 ```bash
@@ -146,6 +147,21 @@ curl http://localhost:8787/api/v1/visual/baselines/<BASELINE_ID>/runs
 If the web UI is running, you can view a run at:
 
 `/visual/baselines/:baselineId/runs/:runId`
+
+### Deploying the UI (static) + API (separate)
+
+The visual regression feature is **server-side** (Playwright + filesystem storage), so it cannot run on GitHub Pages by itself.
+
+To make the hosted UI work:
+
+1. Deploy the API somewhere that can run Playwright (container VM is easiest).
+2. Set `VITE_API_BASE_URL` when building the UI, e.g.:
+
+```bash
+VITE_API_BASE_URL="https://your-api-host.example" npm run build
+```
+
+This makes the UI call `https://your-api-host.example/api/v1/visual/...` instead of `/api/v1/visual/...`.
 
 ## Example Usage
 

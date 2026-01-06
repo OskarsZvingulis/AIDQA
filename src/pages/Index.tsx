@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
+import { getApiBaseUrl } from '@/lib/apiBase';
 
 const EXAMPLE_DESIGN_NODE = `{
   "id": "root",
@@ -55,6 +56,7 @@ export default function Index() {
   const [visualMismatch, setVisualMismatch] = useState<number | null>(null);
   const [visualError, setVisualError] = useState<string | null>(null);
   const [visualLoading, setVisualLoading] = useState(false);
+  const apiBase = getApiBaseUrl();
 
   const parseViewport = () => {
     const width = Number(visualViewportWidth);
@@ -72,8 +74,11 @@ export default function Index() {
     setVisualMismatch(null);
     setVisualLoading(true);
     try {
+      if (!apiBase && !import.meta.env.DEV) {
+        throw new Error('Visual Regression API is not configured for this deployment. Set VITE_API_BASE_URL to your API host (or run locally).');
+      }
       const viewport = parseViewport();
-      const res = await fetch('/api/v1/visual/baselines', {
+      const res = await fetch(`${apiBase}/api/v1/visual/baselines`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
@@ -105,8 +110,11 @@ export default function Index() {
     setVisualMismatch(null);
     setVisualLoading(true);
     try {
+      if (!apiBase && !import.meta.env.DEV) {
+        throw new Error('Visual Regression API is not configured for this deployment. Set VITE_API_BASE_URL to your API host (or run locally).');
+      }
       const viewport = parseViewport();
-      const res = await fetch(`/api/v1/visual/baselines/${visualBaselineId}/runs`, {
+      const res = await fetch(`${apiBase}/api/v1/visual/baselines/${visualBaselineId}/runs`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ viewport }),

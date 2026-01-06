@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { getApiBaseUrl } from '@/lib/apiBase';
 
 type VisualRunResult = {
   runId: string;
@@ -27,13 +28,14 @@ export default function VisualRun() {
   const { baselineId, runId } = useParams();
   const [data, setData] = useState<VisualRunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const apiBase = getApiBaseUrl();
 
   useEffect(() => {
     if (!baselineId || !runId) return;
     setError(null);
     setData(null);
 
-    fetch(`/api/v1/visual/baselines/${baselineId}/runs/${runId}`)
+    fetch(`${apiBase}/api/v1/visual/baselines/${baselineId}/runs/${runId}`)
       .then(async (r) => {
         if (!r.ok) {
           const text = await r.text();
