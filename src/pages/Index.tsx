@@ -48,6 +48,9 @@ export default function Index() {
   const [visualProjectId, setVisualProjectId] = useState('demo');
   const [visualName, setVisualName] = useState('Example.com');
   const [visualUrl, setVisualUrl] = useState('https://example.com');
+  const [visualFigmaFileKey, setVisualFigmaFileKey] = useState('');
+  const [visualFigmaNodeIds, setVisualFigmaNodeIds] = useState('');
+  const [visualUseFigma, setVisualUseFigma] = useState(false);
   const [visualViewportWidth, setVisualViewportWidth] = useState('1440');
   const [visualViewportHeight, setVisualViewportHeight] = useState('900');
   const [visualBaselineId, setVisualBaselineId] = useState<string>('');
@@ -78,15 +81,32 @@ export default function Index() {
         throw new Error('Visual Regression API is not configured for this deployment. Set VITE_API_BASE_URL to your API host (or run locally).');
       }
       const viewport = parseViewport();
+
+      const body: any = {
+        projectId: visualProjectId,
+        name: visualName,
+        viewport,
+      };
+
+      if (visualUseFigma) {
+        if (!visualFigmaFileKey || !visualFigmaNodeIds) {
+          throw new Error('Figma file key and node IDs are required when using Figma');
+        }
+        body.figmaSource = {
+          figmaFileKey: visualFigmaFileKey,
+          figmaNodeIds: visualFigmaNodeIds.split(',').map(id => id.trim()),
+        };
+      } else {
+        if (!visualUrl) {
+          throw new Error('URL is required when not using Figma');
+        }
+        body.url = visualUrl;
+      }
+
       const res = await fetch(`${apiBase}/api/v1/visual/baselines`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          projectId: visualProjectId,
-          name: visualName,
-          url: visualUrl,
-          viewport,
-        }),
+        body: JSON.stringify(body),
       });
       const text = await res.text();
       if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
@@ -170,7 +190,7 @@ export default function Index() {
           <div>
             <h2 className="text-2xl font-semibold">Visual Regression (MVP)</h2>
             <p className="text-sm text-muted-foreground">
-              Create a baseline screenshot, then run an exact pixel compare.
+              Create a baseline screenshot from URL or Figma design, then run exact pixel compare.
             </p>
           </div>
 
@@ -179,6 +199,25 @@ export default function Index() {
               <AlertDescription>{visualError}</AlertDescription>
             </Alert>
           )}
+
+          <div className="flex items-center gap-3 mb-2">
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="radio" 
+                checked={!visualUseFigma} 
+                onChange={() => setVisualUseFigma(false)}
+              />
+              <span>URL</span>
+            </Label>
+            <Label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="radio" 
+                checked={visualUseFigma} 
+                onChange={() => setVisualUseFigma(true)}
+              />
+              <span>Figma</span>
+            </Label>
+          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             <div className="space-y-2 lg:col-span-1">
@@ -189,10 +228,33 @@ export default function Index() {
               <Label htmlFor="visualName">Name</Label>
               <Input id="visualName" value={visualName} onChange={(e) => setVisualName(e.target.value)} />
             </div>
-            <div className="space-y-2 lg:col-span-2">
-              <Label htmlFor="visualUrl">URL</Label>
-              <Input id="visualUrl" value={visualUrl} onChange={(e) => setVisualUrl(e.target.value)} />
-            </div>
+            {!visualUseFigma ? (
+              <div className="space-y-2 lg:col-span-2">
+                <Label htmlFor="visualUrl">URL</Label>
+                <Input id="visualUrl" value={visualUrl} onChange={(e) => setVisualUrl(e.target.value)} />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 lg:col-span-1">
+                  <Label htmlFor="visualFigmaFileKey">Figma File Key</Label>
+                  <Input 
+                    id="visualFigmaFileKey" 
+                    value={visualFigmaFileKey} 
+                    onChange={(e) => setVisualFigmaFileKey(e.target.value)}
+                    placeholder="abc123def456"
+                  />
+                </div>
+                <div className="space-y-2 lg:col-span-1">
+                  <Label htmlFor="visualFigmaNodeIds">Node IDs (comma-separated)</Label>
+                  <Input 
+                    id="visualFigmaNodeIds" 
+                    value={visualFigmaNodeIds} 
+                    onChange={(e) => setVisualFigmaNodeIds(e.target.value)}
+                    placeholder="1:23, 2:45"
+                  />
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="visualViewportWidth">Viewport W</Label>
               <Input id="visualViewportWidth" value={visualViewportWidth} onChange={(e) => setVisualViewportWidth(e.target.value)} />

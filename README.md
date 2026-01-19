@@ -1,14 +1,39 @@
 # Brand Fitting (AIDQA)
 
-An automated design quality assurance tool that scans design files for inconsistencies in design systems, brand standards, and accessibility.
+An automated design quality assurance tool that scans design files for inconsistencies in design systems, brand standards, and accessibility. Now with **visual regression testing** and **Figma integration**.
 
 ## Project Overview
 
 **Problem**: Design teams waste 20-30% of their time fixing inconsistencies in spacing, colors, typography, and components. Handoffs to developers are messy, and enterprises lose thousands per week on preventable design errors.
 
-**Solution**: Brand Fitting automatically analyzes design trees against design system rules and returns a list of issues with actionable suggestions.
+**Solution**: AIDQA automatically:
+- Analyzes design trees against design system rules
+- Performs pixel-perfect visual regression testing
+- Compares Figma designs against live implementations
+- Returns actionable suggestions to fix inconsistencies
 
-Note: This project ships with a default design system configuration called **NorthStar Dashboard**. In the demo web UI you can edit the full design system JSON (left panel) to simulate different token sets.
+## Features
+
+### 1. Design System Analyzer
+- **Pure TypeScript** core module (zero dependencies)
+- Detects 5 categories: spacing, color, text, component, accessibility
+- Works in any environment (web, CLI, Figma plugin)
+- Configurable design system tokens
+
+### 2. Visual Regression Testing
+- **Playwright-based** screenshot capture with deterministic settings
+- **Exact pixel-perfect** PNG comparison (pngjs)
+- Baseline/run management with diff visualization
+- URL-based and **Figma-based** content capture
+- REST API + web UI for creating/viewing tests
+
+### 3. Figma Integration ✨ NEW
+- **Fetch design content** from Figma REST API
+- **Compare Figma designs** vs live implementations
+- Helps validate design handoff accuracy
+- Reduces design-vs-code inconsistencies
+
+Note: This project ships with a default design system configuration called **NorthStar Dashboard**. You can edit the full design system JSON in the web UI to simulate different token sets.
 
 ## Architecture
 
@@ -48,7 +73,30 @@ If you want to work locally using your preferred IDE, clone this repo and instal
 
 Quick start:
 
-```sh
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Install Playwright browsers (for visual regression)
+npx playwright install chromium
+
+# 3. Set up environment (optional: for Figma integration)
+cp .env.example .env
+# Edit .env and add your FIGMA_ACCESS_TOKEN
+
+# 4. Start development servers
+npm run dev:api  # Backend API on http://localhost:8787
+npm start        # Frontend UI on http://localhost:8080
+
+# 5. Run tests
+npm test
+```
+
+Open http://localhost:8080 to access the web UI.
+
+📖 **Figma Setup:** See [docs/FIGMA_SETUP.md](docs/FIGMA_SETUP.md) for detailed instructions on getting your Figma access token and using Figma integration.
+
+📋 **Roadmap:** See [PROJECT_ROADMAP.md](PROJECT_ROADMAP.md) for the full development plan.sh
 git clone <YOUR_GIT_URL>
 cd <YOUR_PROJECT_NAME>
 npm install
@@ -103,7 +151,9 @@ Artifacts are served (dev/MVP) via:
 
 Base path: `/api/v1/visual`
 
-#### (1) Create baseline
+**📖 Full Figma Guide:** [docs/FIGMA_SETUP.md](docs/FIGMA_SETUP.md)
+
+#### (1) Create baseline (URL-based)
 
 ```bash
 curl -X POST http://localhost:8787/api/v1/visual/baselines \
@@ -115,6 +165,27 @@ curl -X POST http://localhost:8787/api/v1/visual/baselines \
     "viewport": {"width": 1440, "height": 900}
   }'
 ```
+
+#### (1b) Create baseline (Figma-based) ✨
+
+```bash
+curl -X POST http://localhost:8787/api/v1/visual/baselines \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectId": "demo",
+    "name": "Homepage Hero from Figma",
+    "figmaSource": {
+      "figmaFileKey": "ABC123DEF456",
+      "figmaNodeIds": ["1:23", "2:45"]
+    },
+    "viewport": {"width": 1440, "height": 900}
+  }'
+```
+
+**Requirements:**
+- Set `FIGMA_ACCESS_TOKEN` in `.env`
+- Get file key from Figma URL: `figma.com/design/{fileKey}/...`
+- Get node IDs: right-click frame → Copy link → extract `node-id=1-23` → convert to `1:23`
 
 #### (2) Create run (capture current + compare)
 

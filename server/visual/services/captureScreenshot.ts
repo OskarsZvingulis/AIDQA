@@ -18,12 +18,17 @@ html { scroll-behavior: auto !important; }
 `;
 
 export async function captureScreenshot(opts: {
-  url: string;
+  url?: string;
+  htmlContent?: string;
   viewport?: Viewport;
   outputPath: string;
   settleMs?: number;
 }): Promise<void> {
-  const { url, viewport = DEFAULT_VIEWPORT, outputPath, settleMs = 250 } = opts;
+  const { url, htmlContent, viewport = DEFAULT_VIEWPORT, outputPath, settleMs = 250 } = opts;
+
+  if (!url && !htmlContent) {
+    throw new Error('Either url or htmlContent must be provided');
+  }
 
   const browser = await chromium.launch({
     headless: true,
@@ -49,7 +54,13 @@ export async function captureScreenshot(opts: {
       document.documentElement.appendChild(style);
     }, DISABLE_ANIMATIONS_CSS);
 
-    await page.goto(url, { waitUntil: 'networkidle' });
+    // Either load URL or set HTML content
+    if (htmlContent) {
+      await page.setContent(htmlContent, { waitUntil: 'networkidle' });
+    } else if (url) {
+      await page.goto(url, { waitUntil: 'networkidle' });
+    }
+
     if (settleMs > 0) {
       await page.waitForTimeout(settleMs);
     }

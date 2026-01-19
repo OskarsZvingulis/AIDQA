@@ -1,10 +1,16 @@
 export type Viewport = { width: number; height: number };
 
+export type FigmaSource = {
+  figmaFileKey: string;
+  figmaNodeIds: string[];
+};
+
 export type VisualBaseline = {
   baselineId: string;
   projectId: string;
   name: string;
-  url: string;
+  url?: string;
+  figmaSource?: FigmaSource;
   viewport: Viewport;
   createdAt: string;
 };

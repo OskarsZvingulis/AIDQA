@@ -18,26 +18,38 @@ import {
   saveBaselineMeta,
   saveRunResult,
 } from '../services/storage.js';
-import type { Viewport, VisualBaseline, VisualRunResult } from '../types.js';
+import type { Viewport, VisualBaseline, VisualRunResult, FigmaSource } from '../types.js';
 import { captureScreenshot } from '../services/captureScreenshot.js';
 import { comparePngExact, DimensionMismatchError } from '../services/comparePngExact.js';
+import { fetchFigmaContent } from '../services/figma.js';
 
 const viewportSchema = z
   .object({ width: z.number().int().positive(), height: z.number().int().positive() })
   .strict();
 
+const figmaSourceSchema = z.object({
+  figmaFileKey: z.string().min(1),
+  figmaNodeIds: z.array(z.string().min(1)),
+}).strict();
+
 const createBaselineSchema = z
   .object({
     projectId: z.string().min(1),
     name: z.string().min(1),
-    url: z.string().url(),
+    url: z.string().url().optional(),
+    figmaSource: figmaSourceSchema.optional(),
     viewport: viewportSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => data.url || data.figmaSource,
+    { message: 'Either url or figmaSource must be provided' }
+  );
 
 const createRunSchema = z
   .object({
     url: z.string().url().optional(),
+    figmaSource: figmaSourceSchema.optional(),
     viewport: viewportSchema.optional(),
   })
   .strict();
@@ -64,7 +76,7 @@ export function registerVisualRoutes(router: Router) {
       return res.status(400).json({ error: parsed.error.message });
     }
 
-    const { projectId, name, url } = parsed.data;
+    const { projectId, name, url, figmaSource } = parsed.data;
     const viewport = normalizeViewport(parsed.data.viewport as Viewport | undefined);
 
     const baselineId = uuidv4();
@@ -75,6 +87,7 @@ export function registerVisualRoutes(router: Router) {
       projectId,
       name,
       url,
+      figmaSource: figmaSource as FigmaSource | undefined,
       viewport,
       createdAt,
     };
@@ -83,7 +96,25 @@ export function registerVisualRoutes(router: Router) {
 
     try {
       await ensureBaselineFolder(projectId, baselineId);
-      await captureScreenshot({ url, viewport, outputPath: baselinePath });
+
+      // Fetch Figma content if figmaSource provided
+      let htmlContent: string | undefined;
+      if (figmaSource) {
+        const token = process.env.FIGMA_ACCESS_TOKEN || '';
+        const figmaResult = await fetchFigmaContent(
+          figmaSource.figmaFileKey,
+          figmaSource.figmaNodeIds,
+          token
+        );
+        htmlContent = figmaResult.combinedHtml;
+      }
+
+      await captureScreenshot({ 
+        url, 
+        htmlContent,
+        viewport, 
+        outputPath: baselinePath 
+      });
       await saveBaselineMeta(baseline);
 
       return res.status(201).json({
@@ -91,6 +122,7 @@ export function registerVisualRoutes(router: Router) {
         projectId,
         name,
         url,
+        figmaSource,
         viewport,
         baselineImagePath: toPublicStoragePath(baselinePath),
         createdAt,
@@ -125,6 +157,7 @@ export function registerVisualRoutes(router: Router) {
     }
 
     const url = parsed.data.url ?? baseline.url;
+    const figmaSource = (parsed.data.figmaSource as FigmaSource | undefined) ?? baseline.figmaSource;
     const viewport = normalizeViewport((parsed.data.viewport as Viewport | undefined) ?? baseline.viewport);
 
     const runId = uuidv4();
@@ -139,7 +172,19 @@ export function registerVisualRoutes(router: Router) {
 
     try {
       try {
-        await captureScreenshot({ url, viewport, outputPath: currentPath });
+        // Fetch Figma content if figmaSource provided
+        let htmlContent: string | undefined;
+        if (figmaSource) {
+          const token = process.env.FIGMA_ACCESS_TOKEN || '';
+          const figmaResult = await fetchFigmaContent(
+            figmaSource.figmaFileKey,
+            figmaSource.figmaNodeIds,
+            token
+          );
+          htmlContent = figmaResult.combinedHtml;
+        }
+
+        await captureScreenshot({ url, htmlContent, viewport, outputPath: currentPath });
       } catch (e) {
         result = {
           runId,
