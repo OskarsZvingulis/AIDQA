@@ -30,6 +30,9 @@ export async function captureScreenshot(opts: {
     throw new Error('Either url or htmlContent must be provided');
   }
 
+  console.log('[SCREENSHOT] Source:', htmlContent ? 'htmlContent' : `url: ${url}`);
+  console.log('[SCREENSHOT] Output path:', outputPath);
+
   const browser = await chromium.launch({
     headless: true,
   });

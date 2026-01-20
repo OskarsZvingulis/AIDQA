@@ -25,16 +25,32 @@ export async function fetchFigmaContent(
   figmaAccessToken: string
 ): Promise<FigmaFetchResult> {
   if (!figmaAccessToken) {
-    throw new Error('FIGMA_ACCESS_TOKEN environment variable is required');
+    throw new Error('Set FIGMA_ACCESS_TOKEN in .env');
   }
 
   // Figma API endpoint: GET /v1/files/:file_key/nodes
   const nodeIdsQuery = nodeIds.map(id => `ids=${encodeURIComponent(id)}`).join('&');
   const url = `https://api.figma.com/v1/files/${figmaFileKey}/nodes?${nodeIdsQuery}`;
 
-  const response = await httpsGet(url, {
-    'X-Figma-Token': figmaAccessToken,
-  });
+  console.log('[FIGMA] Request URL:', url.replace(/\/files\/[^\/]+/, '/files/***'));
+  console.log('[FIGMA] Node IDs:', nodeIds.join(', '));
+
+  let response: string;
+  let statusCode: number;
+  try {
+    const result = await httpsGet(url, {
+      'X-Figma-Token': figmaAccessToken,
+    });
+    response = result.body;
+    statusCode = result.statusCode;
+  } catch (error: any) {
+    if (error.message.includes('401') || error.message.includes('403')) {
+      throw new Error('Token invalid or no access to file');
+    }
+    throw error;
+  }
+
+  console.log('[FIGMA] Response status:', statusCode);
 
   const data = JSON.parse(response);
 
@@ -49,7 +65,7 @@ export async function fetchFigmaContent(
   for (const nodeId of nodeIds) {
     const nodeData = data.nodes[nodeId];
     if (!nodeData || !nodeData.document) {
-      console.warn(`Node ${nodeId} not found in Figma response`);
+      console.warn(`[FIGMA] Node ${nodeId} not found - check 1:23 format (not 1-23)`);
       continue;
     }
 
@@ -96,6 +112,12 @@ export async function fetchFigmaContent(
   ${htmlParts.join('\n  ')}
 </body>
 </html>`.trim();
+
+  console.log('[FIGMA] Combined HTML length:', combinedHtml.length, 'chars');
+
+  if (htmlParts.length === 0) {
+    console.warn('[FIGMA] Selected nodes produced no renderable content');
+  }
 
   return { nodes, combinedHtml };
 }
@@ -152,7 +174,7 @@ function escapeHtml(text: string): string {
 /**
  * Make HTTPS GET request (Node.js native, no dependencies)
  */
-function httpsGet(url: string, headers: Record<string, string>): Promise<string> {
+function httpsGet(url: string, headers: Record<string, string>): Promise<{ body: string; statusCode: number }> {
   return new Promise((resolve, reject) => {
     const options = {
       headers,
@@ -167,7 +189,7 @@ function httpsGet(url: string, headers: Record<string, string>): Promise<string>
 
       res.on('end', () => {
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-          resolve(data);
+          resolve({ body: data, statusCode: res.statusCode });
         } else {
           reject(new Error(`HTTP ${res.statusCode}: ${data}`));
         }

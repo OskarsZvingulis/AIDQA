@@ -96,7 +96,55 @@ Open http://localhost:8080 to access the web UI.
 
 📖 **Figma Setup:** See [docs/FIGMA_SETUP.md](docs/FIGMA_SETUP.md) for detailed instructions on getting your Figma access token and using Figma integration.
 
-📋 **Roadmap:** See [PROJECT_ROADMAP.md](PROJECT_ROADMAP.md) for the full development plan.sh
+📋 **Roadmap:** See [PROJECT_ROADMAP.md](PROJECT_ROADMAP.md) for the full development plan.
+
+### Figma Smoke Test
+
+After setting up your Figma access token, verify the integration works:
+
+```bash
+# 1. Edit server/visual/__tests__/figmaSmokeTest.ts
+#    Replace "REPLACE_ME" with your actual Figma file key and node IDs
+
+# 2. Run the smoke test
+npx tsx server/visual/__tests__/figmaSmokeTest.ts
+```
+
+**Success looks like:**
+```
+🧪 Figma Integration Smoke Test
+================================
+
+📄 File Key: abc123def456
+🔍 Node IDs: 1:23, 2:45
+🔑 Token: figd_abc...xyz
+
+📡 Fetching Figma content...
+[FIGMA] Request URL: https://api.figma.com/v1/files/***/nodes?...
+[FIGMA] Node IDs: 1:23, 2:45
+[FIGMA] Response status: 200
+[FIGMA] Combined HTML length: 1234 chars
+✅ Fetched 2 node(s)
+📝 Combined HTML length: 1234 chars
+
+📸 Capturing screenshot...
+[SCREENSHOT] Source: htmlContent
+[SCREENSHOT] Output path: .../storage/_smoke/figma-baseline.png
+✅ Screenshot saved: .../storage/_smoke/figma-baseline.png
+
+✅ OK - Figma integration smoke test passed!
+```
+
+**Common failures & fixes:**
+
+| Error | Fix |
+|-------|-----|
+| `FIGMA_ACCESS_TOKEN not found` | Set `FIGMA_ACCESS_TOKEN` in `.env` |
+| `Token invalid or no access to file` | Verify token at [Figma Developer Settings](https://www.figma.com/developers/api#access-tokens) |
+| `Node IDs not found` | Check format: `"1:23"` (colon, not dash). Get from Figma: right-click → Copy link |
+| `Selected nodes produced no renderable content` | Choose nodes with text/visual content (not empty frames) |
+
+sh
 git clone <YOUR_GIT_URL>
 cd <YOUR_PROJECT_NAME>
 npm install
