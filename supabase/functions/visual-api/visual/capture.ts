@@ -42,22 +42,13 @@ export async function captureScreenshot(opts: {
     body: JSON.stringify({
       url,
       options: {
-        fullPage: false,
         type: 'png',
+        fullPage: false,
       },
       viewport: {
         width: viewport.width,
         height: viewport.height,
-        deviceScaleFactor: 1,
       },
-      waitFor: SETTLE_MS,
-      addScriptTag: [{
-        content: `
-          const style = document.createElement('style');
-          style.textContent = ${JSON.stringify(DISABLE_ANIMATIONS_CSS)};
-          document.head.appendChild(style);
-        `,
-      }],
     }),
   });
 

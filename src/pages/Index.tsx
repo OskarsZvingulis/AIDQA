@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
-import { getApiBaseUrl, validateApiConfig } from '@/lib/apiBase';
+import { getApiBaseUrl, validateApiConfig, getApiHeaders } from '@/lib/apiBase';
 
 const EXAMPLE_DESIGN_NODE = `{
   "id": "root",
@@ -84,8 +84,8 @@ export default function Index() {
       const viewport = parseViewport();
 
       const body: any = {
-        project_id: visualProjectId,
-        name: visualName,
+        projectId: visualProjectId.trim(),
+        name: visualName.trim(),
         viewport,
       };
 
@@ -94,25 +94,30 @@ export default function Index() {
           throw new Error('Figma file key and node IDs are required when using Figma');
         }
         body.figmaSource = {
-          figmaFileKey: visualFigmaFileKey,
-          figmaNodeIds: visualFigmaNodeIds.split(',').map(id => id.trim()),
+          figmaFileKey: visualFigmaFileKey.trim(),
+          figmaNodeIds: visualFigmaNodeIds.split(',').map((id: string) => id.trim()),
         };
       } else {
         if (!visualUrl) {
           throw new Error('URL is required when not using Figma');
         }
-        body.url = visualUrl;
+        body.url = visualUrl.trim();
       }
+
+      console.log('CREATE_BASELINE body =>', body);
 
       const res = await fetch(`${apiBase}/api/v1/visual/baselines`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: getApiHeaders(),
         body: JSON.stringify(body),
       });
       const text = await res.text();
       if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
-      const json = JSON.parse(text) as { baselineId: string };
-      setVisualBaselineId(json.baselineId);
+      const json = JSON.parse(text);
+      
+      const baselineId = json.baselineId ?? json.id;
+      if (!baselineId) throw new Error(`Unexpected response: ${text}`);
+      setVisualBaselineId(baselineId);
     } catch (e) {
       setVisualError(e instanceof Error ? e.message : 'Failed to create baseline');
     } finally {
@@ -135,22 +140,20 @@ export default function Index() {
       if (!configCheck.valid) {
         throw new Error(configCheck.error);
       }
-      const viewport = parseViewport();
       const res = await fetch(`${apiBase}/api/v1/visual/baselines/${visualBaselineId}/runs`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ viewport }),
+        headers: getApiHeaders(),
+        body: JSON.stringify({}),
       });
       const text = await res.text();
       if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
-      const json = JSON.parse(text) as {
-        runId: string;
-        status: 'PASS' | 'FAIL' | 'ERROR';
-        metrics: { mismatchPixelCount: number };
-      };
-      setVisualRunId(json.runId);
-      setVisualStatus(json.status);
-      setVisualMismatch(json.metrics?.mismatchPixelCount ?? null);
+      const json = JSON.parse(text);
+      
+      const runId = json.runId ?? json.id;
+      if (!runId) throw new Error(`Unexpected response: ${text}`);
+      setVisualRunId(runId);
+      setVisualStatus(json.status || 'PASS');
+      setVisualMismatch(json.diffPixels ?? json.mismatchPixelCount ?? null);
     } catch (e) {
       setVisualError(e instanceof Error ? e.message : 'Failed to create run');
     } finally {

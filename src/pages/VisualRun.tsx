@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getApiBaseUrl } from '@/lib/apiBase';
+import { getApiBaseUrl, getApiHeaders } from '@/lib/apiBase';
 
 type AIIssue = {
   title: string;
@@ -46,7 +46,9 @@ export default function VisualRun() {
     setError(null);
     setData(null);
 
-    fetch(`${apiBase}/api/v1/visual/baselines/${baselineId}/runs/${runId}`)
+    fetch(`${apiBase}/api/v1/visual/baselines/${baselineId}/runs/${runId}`, {
+      headers: getApiHeaders(),
+    })
       .then(async (r) => {
         if (!r.ok) {
           const text = await r.text();

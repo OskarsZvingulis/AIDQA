@@ -16,6 +16,27 @@ export function getApiBaseUrl(): string {
 }
 
 /**
+ * Get Supabase anon key for API authentication
+ */
+export function getSupabaseAnonKey(): string {
+  const key = (import.meta as unknown as { env?: Record<string, unknown> })?.env?.VITE_SUPABASE_ANON_KEY;
+  return typeof key === 'string' ? key : '';
+}
+
+/**
+ * Get headers for API requests with authentication
+ */
+export function getApiHeaders(): Record<string, string> {
+  const anonKey = getSupabaseAnonKey();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (anonKey) {
+    headers['Authorization'] = `Bearer ${anonKey}`;
+    headers['apikey'] = anonKey;
+  }
+  return headers;
+}
+
+/**
  * Check if we're in hosted mode (Vercel, etc.) and API base URL is required
  */
 export function isHostedMode(): boolean {
