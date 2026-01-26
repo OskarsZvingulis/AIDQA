@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Link } from 'react-router-dom';
-import { getApiBaseUrl } from '@/lib/apiBase';
+import { getApiBaseUrl, validateApiConfig } from '@/lib/apiBase';
 
 const EXAMPLE_DESIGN_NODE = `{
   "id": "root",
@@ -77,13 +77,14 @@ export default function Index() {
     setVisualMismatch(null);
     setVisualLoading(true);
     try {
-      if (!apiBase && !import.meta.env.DEV) {
-        throw new Error('Visual Regression API is not configured for this deployment. Set VITE_API_BASE_URL to your API host (or run locally).');
+      const configCheck = validateApiConfig();
+      if (!configCheck.valid) {
+        throw new Error(configCheck.error);
       }
       const viewport = parseViewport();
 
       const body: any = {
-        projectId: visualProjectId,
+        project_id: visualProjectId,
         name: visualName,
         viewport,
       };
@@ -130,8 +131,9 @@ export default function Index() {
     setVisualMismatch(null);
     setVisualLoading(true);
     try {
-      if (!apiBase && !import.meta.env.DEV) {
-        throw new Error('Visual Regression API is not configured for this deployment. Set VITE_API_BASE_URL to your API host (or run locally).');
+      const configCheck = validateApiConfig();
+      if (!configCheck.valid) {
+        throw new Error(configCheck.error);
       }
       const viewport = parseViewport();
       const res = await fetch(`${apiBase}/api/v1/visual/baselines/${visualBaselineId}/runs`, {
@@ -231,7 +233,13 @@ export default function Index() {
             {!visualUseFigma ? (
               <div className="space-y-2 lg:col-span-2">
                 <Label htmlFor="visualUrl">URL</Label>
-                <Input id="visualUrl" value={visualUrl} onChange={(e) => setVisualUrl(e.target.value)} />
+                <Input 
+                  id="visualUrl" 
+                  value={visualUrl} 
+                  onChange={(e) => setVisualUrl(e.target.value)}
+                  placeholder=""
+                  className="placeholder:text-gray-400"
+                />
               </div>
             ) : (
               <>

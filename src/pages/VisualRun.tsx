@@ -3,25 +3,36 @@ import { useParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { getApiBaseUrl } from '@/lib/apiBase';
 
+type AIIssue = {
+  title: string;
+  type: 'layout' | 'spacing' | 'typography' | 'color' | 'missing_element' | 'overflow' | 'alignment' | 'other';
+  severity: 'minor' | 'major';
+  evidence: string;
+  recommendation: string;
+};
+
+type AIInsights = {
+  summary: string;
+  severity: 'pass' | 'minor' | 'major';
+  issues: AIIssue[];
+  quickWins: string[];
+};
+
 type VisualRunResult = {
-  runId: string;
+  id: string;
   baselineId: string;
-  status: 'PASS' | 'FAIL' | 'ERROR';
-  errorCode: 'DIMENSION_MISMATCH' | 'CAPTURE_FAILED' | 'COMPARE_FAILED' | null;
-  metrics: {
-    mismatchPixelCount: number;
-    totalPixels: number;
-    mismatchPercent: number;
-  };
-  artifacts: {
-    baseline: string;
-    current: string;
-    diff: string | null;
-    resultJson: string;
-  };
+  projectId: string;
   createdAt: string;
+  status: 'completed' | 'failed';
+  mismatchPercentage: number;
+  diffPixels: number;
+  currentUrl: string;
+  diffUrl: string | null;
+  baselineUrl?: string;
+  aiJson?: AIInsights | null;
 };
 
 export default function VisualRun() {
@@ -68,77 +79,131 @@ export default function VisualRun() {
           <>
             <Card className="p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <Badge variant={data.status === 'PASS' ? 'default' : data.status === 'FAIL' ? 'secondary' : 'destructive'}>
-                  {data.status}
+                <Badge variant={data.status === 'completed' ? 'default' : 'destructive'}>
+                  {data.status.toUpperCase()}
                 </Badge>
-                {data.errorCode && <Badge variant="outline">{data.errorCode}</Badge>}
                 <span className="text-sm text-muted-foreground">{new Date(data.createdAt).toLocaleString()}</span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card className="p-4">
                   <p className="text-sm font-medium mb-2">Mismatch Pixels</p>
-                  <p className="text-2xl font-bold">{data.metrics.mismatchPixelCount}</p>
-                </Card>
-                <Card className="p-4">
-                  <p className="text-sm font-medium mb-2">Total Pixels</p>
-                  <p className="text-2xl font-bold">{data.metrics.totalPixels}</p>
+                  <p className="text-2xl font-bold">{data.diffPixels.toLocaleString()}</p>
                 </Card>
                 <Card className="p-4">
                   <p className="text-sm font-medium mb-2">Mismatch %</p>
-                  <p className="text-2xl font-bold">{data.metrics.mismatchPercent.toFixed(4)}%</p>
+                  <p className="text-2xl font-bold">{data.mismatchPercentage.toFixed(4)}%</p>
                 </Card>
               </div>
             </Card>
 
+            {/* AI Insights Panel */}
+            {data.aiJson && (
+              <>
+                <Separator />
+                <Card className="p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-semibold">AI Insights</h2>
+                    <Badge variant={
+                      data.aiJson.severity === 'pass' ? 'default' :
+                      data.aiJson.severity === 'minor' ? 'secondary' : 'destructive'
+                    }>
+                      {data.aiJson.severity.toUpperCase()}
+                    </Badge>
+                  </div>
+
+                  <Alert>
+                    <AlertTitle>Summary</AlertTitle>
+                    <AlertDescription>{data.aiJson.summary}</AlertDescription>
+                  </Alert>
+
+                  {data.aiJson.issues.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-sm">Issues Detected ({data.aiJson.issues.length})</h3>
+                      {data.aiJson.issues.map((issue, idx) => (
+                        <Card key={idx} className="p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="font-medium">{issue.title}</h4>
+                            <div className="flex gap-2">
+                              <Badge variant="outline">{issue.type}</Badge>
+                              <Badge variant={issue.severity === 'major' ? 'destructive' : 'secondary'}>
+                                {issue.severity}
+                              </Badge>
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{issue.evidence}</p>
+                          <div className="pt-2 border-t">
+                            <p className="text-sm font-medium">Recommendation:</p>
+                            <p className="text-sm">{issue.recommendation}</p>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {data.aiJson.quickWins.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="font-semibold text-sm">Quick Wins</h3>
+                      <ul className="list-disc list-inside space-y-1">
+                        {data.aiJson.quickWins.map((win, idx) => (
+                          <li key={idx} className="text-sm">{win}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </Card>
+              </>
+            )}
+
+            {!data.aiJson && (
+              <>
+                <Separator />
+                <Card className="p-6">
+                  <p className="text-sm text-muted-foreground">
+                    AI insights are disabled. Set OPENAI_API_KEY to enable AI-powered visual regression analysis.
+                  </p>
+                </Card>
+              </>
+            )}
+
             <Separator />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold">Baseline</p>
-                  <a className="text-sm underline text-muted-foreground" href={data.artifacts.baseline} target="_blank" rel="noreferrer">
-                    Open
-                  </a>
-                </div>
-                <img src={data.artifacts.baseline} alt="Baseline" className="w-full rounded border" />
-              </Card>
-
-              <Card className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold">Current</p>
-                  {data.artifacts.current ? (
-                    <a className="text-sm underline text-muted-foreground" href={data.artifacts.current} target="_blank" rel="noreferrer">
-                      Open
+              {data.baselineUrl && (
+                <Card className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">Baseline</p>
+                    <a href={data.baselineUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                      View
                     </a>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">(missing)</span>
-                  )}
-                </div>
-                {data.artifacts.current ? (
-                  <img src={data.artifacts.current} alt="Current" className="w-full rounded border" />
-                ) : (
-                  <div className="text-sm text-muted-foreground">No current screenshot.</div>
-                )}
-              </Card>
+                  </div>
+                  <img src={data.baselineUrl} alt="Baseline" className="w-full rounded border" />
+                </Card>
+              )}
 
-              <Card className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold">Diff</p>
-                  {data.artifacts.diff ? (
-                    <a className="text-sm underline text-muted-foreground" href={data.artifacts.diff} target="_blank" rel="noreferrer">
-                      Open
+              {data.currentUrl && (
+                <Card className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">Current</p>
+                    <a href={data.currentUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                      View
                     </a>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">(none)</span>
-                  )}
-                </div>
-                {data.artifacts.diff ? (
-                  <img src={data.artifacts.diff} alt="Diff" className="w-full rounded border" />
-                ) : (
-                  <div className="text-sm text-muted-foreground">No diff image for this run.</div>
-                )}
-              </Card>
+                  </div>
+                  <img src={data.currentUrl} alt="Current" className="w-full rounded border" />
+                </Card>
+              )}
+
+              {data.diffUrl && (
+                <Card className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-semibold">Diff</p>
+                    <a href={data.diffUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                      View
+                    </a>
+                  </div>
+                  <img src={data.diffUrl} alt="Diff" className="w-full rounded border" />
+                </Card>
+              )}
             </div>
           </>
         )}

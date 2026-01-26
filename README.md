@@ -1,39 +1,43 @@
-# Brand Fitting (AIDQA)
+# AIDQA - AI-Powered Design Quality Assurance
 
-An automated design quality assurance tool that scans design files for inconsistencies in design systems, brand standards, and accessibility. Now with **visual regression testing** and **Figma integration**.
+An automated design quality assurance tool for visual regression testing with AI insights. **Production-ready, fully hosted on Supabase + Vercel.**
 
 ## Project Overview
 
-**Problem**: Design teams waste 20-30% of their time fixing inconsistencies in spacing, colors, typography, and components. Handoffs to developers are messy, and enterprises lose thousands per week on preventable design errors.
+**Problem**: Visual regressions slip through manual QA, causing UI bugs in production. Design teams waste time manually comparing screenshots and debugging layout shifts.
 
 **Solution**: AIDQA automatically:
-- Analyzes design trees against design system rules
-- Performs pixel-perfect visual regression testing
-- Compares Figma designs against live implementations
-- Returns actionable suggestions to fix inconsistencies
+- Captures pixel-perfect screenshots of live URLs
+- Compares against baseline images with exact pixel diff
+- Highlights visual differences with magenta overlays
+- **NEW**: Provides AI-powered insights on what changed and why it matters
+- Stores all artifacts in Supabase (Postgres + Storage)
+- Deploys anywhere with serverless Edge Functions
 
 ## Features
 
-### 1. Design System Analyzer
+### 1. Visual Regression Testing ✨ **Production-Ready**
+- **Serverless architecture** using Supabase Edge Functions (Deno)
+- **Remote browser** screenshot capture via Browserless WebSocket
+- **Exact pixel-perfect** PNG comparison with diff visualization
+- **Supabase Storage** for baseline/current/diff images (private bucket)
+- **Postgres database** for run metadata and history with RLS enabled
+- REST API + React web UI
+- **SSRF protection** blocks localhost/private IPs
+- **Rate limiting** prevents abuse (30 req/min per IP)
+
+### 2. AI Insights (OpenAI) 🤖 **NEW**
+- Analyzes baseline vs current screenshots with GPT-4o Vision
+- Identifies layout shifts, spacing issues, typography changes
+- Structured JSON output with severity levels (pass/minor/major)
+- Actionable recommendations for each detected issue
+- Optional: works without AI (graceful degradation)
+
+### 3. Design System Analyzer (Legacy)
 - **Pure TypeScript** core module (zero dependencies)
 - Detects 5 categories: spacing, color, text, component, accessibility
 - Works in any environment (web, CLI, Figma plugin)
 - Configurable design system tokens
-
-### 2. Visual Regression Testing
-- **Playwright-based** screenshot capture with deterministic settings
-- **Exact pixel-perfect** PNG comparison (pngjs)
-- Baseline/run management with diff visualization
-- URL-based and **Figma-based** content capture
-- REST API + web UI for creating/viewing tests
-
-### 3. Figma Integration ✨ NEW
-- **Fetch design content** from Figma REST API
-- **Compare Figma designs** vs live implementations
-- Helps validate design handoff accuracy
-- Reduces design-vs-code inconsistencies
-
-Note: This project ships with a default design system configuration called **NorthStar Dashboard**. You can edit the full design system JSON in the web UI to simulate different token sets.
 
 ## Architecture
 
@@ -63,97 +67,273 @@ A React + Vite application that demonstrates the core module's capabilities:
 - Run analysis and view results in a clean, filterable UI
 - See issue counts by category and detailed suggestions
 
-## How can I run this locally?
+## Quick Start
 
-There are several ways of editing your application.
-
-**Working locally**
-
-If you want to work locally using your preferred IDE, clone this repo and install dependencies. The only requirement is Node.js & npm (or pnpm/yarn).
-
-Quick start:
+### Option 1: Local Development with Supabase (Recommended)
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Install Playwright browsers (for visual regression)
-npx playwright install chromium
-
-# 3. Set up environment (optional: for Figma integration)
-cp .env.example .env
-# Edit .env and add your FIGMA_ACCESS_TOKEN
-
-# 4. Start development servers
-npm run dev:api  # Backend API on http://localhost:8787
-npm start        # Frontend UI on http://localhost:8080
-
-# 5. Run tests
-npm test
-```
-
-Open http://localhost:8080 to access the web UI.
-
-📖 **Figma Setup:** See [docs/FIGMA_SETUP.md](docs/FIGMA_SETUP.md) for detailed instructions on getting your Figma access token and using Figma integration.
-
-📋 **Roadmap:** See [PROJECT_ROADMAP.md](PROJECT_ROADMAP.md) for the full development plan.
-
-### Figma Smoke Test
-
-After setting up your Figma access token, verify the integration works:
-
-```bash
-# 1. Edit server/visual/__tests__/figmaSmokeTest.ts
-#    Replace "REPLACE_ME" with your actual Figma file key and node IDs
-
-# 2. Run the smoke test
-npx tsx server/visual/__tests__/figmaSmokeTest.ts
-```
-
-**Success looks like:**
-```
-🧪 Figma Integration Smoke Test
-================================
-
-📄 File Key: abc123def456
-🔍 Node IDs: 1:23, 2:45
-🔑 Token: figd_abc...xyz
-
-📡 Fetching Figma content...
-[FIGMA] Request URL: https://api.figma.com/v1/files/***/nodes?...
-[FIGMA] Node IDs: 1:23, 2:45
-[FIGMA] Response status: 200
-[FIGMA] Combined HTML length: 1234 chars
-✅ Fetched 2 node(s)
-📝 Combined HTML length: 1234 chars
-
-📸 Capturing screenshot...
-[SCREENSHOT] Source: htmlContent
-[SCREENSHOT] Output path: .../storage/_smoke/figma-baseline.png
-✅ Screenshot saved: .../storage/_smoke/figma-baseline.png
-
-✅ OK - Figma integration smoke test passed!
-```
-
-**Common failures & fixes:**
-
-| Error | Fix |
-|-------|-----|
-| `FIGMA_ACCESS_TOKEN not found` | Set `FIGMA_ACCESS_TOKEN` in `.env` |
-| `Token invalid or no access to file` | Verify token at [Figma Developer Settings](https://www.figma.com/developers/api#access-tokens) |
-| `Node IDs not found` | Check format: `"1:23"` (colon, not dash). Get from Figma: right-click → Copy link |
-| `Selected nodes produced no renderable content` | Choose nodes with text/visual content (not empty frames) |
-
-sh
+# 1. Clone and install
 git clone <YOUR_GIT_URL>
-cd <YOUR_PROJECT_NAME>
+cd AIDQA
 npm install
-npm run dev
+
+# 2. Install Supabase CLI
+npm install -g supabase
+
+# 3. Initialize Supabase locally
+supabase init
+supabase start
+
+# 4. Apply database schema
+supabase db reset  # Applies migrations including supabase/sql/001_init.sql
+
+# 5. Create Storage bucket
+# Go to http://localhost:54323 (Supabase Studio)
+# Storage → Create bucket → Name: "visual" → Private
+
+# 6. Set Edge Function secrets (for local dev)
+supabase secrets set SUPABASE_URL=http://localhost:54321
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=<from_supabase_start_output>
+supabase secrets set STORAGE_BUCKET=visual
+supabase secrets set BROWSERLESS_WS_ENDPOINT=<your_browserless_ws_url>
+# Optional: supabase secrets set OPENAI_API_KEY=sk-...
+
+# 7. Start Edge Function locally
+supabase functions serve visual-api --env-file .env
+
+# 8. Start frontend (in new terminal)
+VITE_API_BASE_URL=http://127.0.0.1:54321/functions/v1/visual-api npm run dev
+
+# Open http://localhost:8080
 ```
 
-## Visual Regression API (MVP)
+### Option 2: Production Deployment
 
-This repo is primarily a frontend + core TypeScript analyzer, but it also includes a small Node/Express API for **pixel-perfect visual regression** under `/api/v1/visual`.
+**Prerequisites:**
+- Supabase account (free tier works)
+- Browserless.io account for remote browser (or similar service)
+- Vercel account for frontend hosting
+- (Optional) OpenAI API key for AI insights
+
+**Step 1: Supabase Setup**
+
+```bash
+# 1. Link to your Supabase project
+supabase link --project-ref <your-project-ref>
+
+# 2. Apply database schema
+supabase db push
+
+# 3. Create Storage bucket
+# Dashboard → Storage → Create bucket → "visual" (PRIVATE)
+
+# 4. Set production secrets
+supabase secrets set SUPABASE_URL=https://<project-ref>.supabase.co
+supabase secrets set SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+supabase secrets set STORAGE_BUCKET=visual
+supabase secrets set BROWSERLESS_WS_ENDPOINT=wss://chrome.browserless.io?token=<token>
+supabase secrets set ALLOWED_ORIGINS=https://your-frontend.vercel.app
+supabase secrets set OPENAI_API_KEY=sk-...
+supabase secrets set AI_ENABLED=true
+
+# 5. Deploy Edge Function
+supabase functions deploy visual-api
+
+# 6. Test the deployed function
+curl https://<project-ref>.supabase.co/functions/v1/visual-api/health
+```
+
+**Step 2: Vercel Frontend Deployment**
+
+```bash
+# 1. Install Vercel CLI (optional)
+npm install -g vercel
+
+# 2. Set environment variable in Vercel Dashboard
+# Settings → Environment Variables
+# VITE_API_BASE_URL=https://<project-ref>.supabase.co/functions/v1/visual-api
+
+# 3. Deploy
+vercel --prod
+
+# Or connect GitHub repo and auto-deploy on push
+```
+
+**Step 3: Verify Deployment**
+
+1. Check API health: `https://<project-ref>.supabase.co/functions/v1/visual-api/health`
+2. Open your Vercel URL: `https://your-app.vercel.app`
+3. Create a baseline screenshot to test end-to-end
+4. View data in Supabase Dashboard:
+   - **Database → Table Editor** → `visual_baselines` and `visual_runs`
+   - **Storage** → `visual` bucket → Browse artifacts
+
+## Environment Variables
+
+See [.env.example](.env.example) for all configuration options.
+
+**Required Supabase Edge Function Secrets:**
+- `SUPABASE_URL` - Your Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` - Service role key (never expose to client!)
+- `STORAGE_BUCKET` - Storage bucket name (default: `visual`)
+- `BROWSERLESS_WS_ENDPOINT` - Remote browser WebSocket URL
+
+**Optional:**
+- `OPENAI_API_KEY` - Enable AI insights (GPT-4o Vision)
+- `AI_ENABLED` - Toggle AI (default: `true`)
+- `ALLOWED_ORIGINS` - CORS whitelist (default: `*`)
+- `RATE_LIMIT_PER_MINUTE` - Rate limit (default: `30`)
+
+**Frontend (Vercel):**
+- `VITE_API_BASE_URL` - Edge Function URL (leave empty for local dev)
+
+## Architecture
+
+### Technology Stack
+
+**Frontend:**
+- React 18 + Vite
+- TypeScript
+- TanStack Query for data fetching
+- shadcn/ui components
+- Deployed on Vercel
+
+**Backend (Supabase Edge Functions):**
+- Deno runtime (serverless)
+- Supabase Postgres (metadata)
+- Supabase Storage (artifacts)
+- Remote browser via Browserless.io
+- OpenAI GPT-4o Vision (AI insights)
+
+**Security:**
+- Row Level Security (RLS) on all tables
+- Service role key server-side only
+- SSRF protection (blocks localhost/private IPs)
+- Rate limiting (per-IP)
+- Private storage bucket with signed URLs (6-hour expiry)
+
+### Folder Structure
+
+```
+AIDQA/
+├── src/                    # Frontend (React + Vite)
+│   ├── components/         # shadcn/ui components
+│   ├── core/              # Pure TS design analyzer (zero deps)
+│   ├── lib/               # API client + utils
+│   └── pages/             # Route pages (Index, VisualRun)
+│
+├── supabase/
+│   ├── functions/
+│   │   └── visual-api/    # Edge Function (Deno)
+│   │       ├── index.ts   # Router + CORS
+│   │       ├── _lib/      # Shared utilities
+│   │       │   ├── supabaseServer.ts
+│   │       │   ├── storage.ts
+│   │       │   ├── rateLimit.ts
+│   │       │   ├── ssrfGuard.ts
+│   │       │   ├── openai.ts
+│   │       │   └── types.ts
+│   │       └── visual/    # Route handlers
+│   │           ├── handlers.ts
+│   │           ├── capture.ts  (remote browser)
+│   │           └── diff.ts     (PNG comparison)
+│   └── sql/
+│       └── 001_init.sql   # Database schema
+│
+├── .env.example           # Environment template
+└── README.md
+```
+
+## API Reference
+
+Base URL: `https://<project-ref>.supabase.co/functions/v1/visual-api`
+
+### Endpoints
+
+**Health Check**
+```
+GET /health
+```
+
+**Create Baseline**
+```
+POST /api/v1/visual/baselines
+Content-Type: application/json
+
+{
+  "projectId": "demo",
+  "name": "Homepage",
+  "url": "https://example.com",
+  "viewport": { "width": 1440, "height": 900 }
+}
+```
+
+**List Baselines**
+```
+GET /api/v1/visual/baselines?projectId=demo
+```
+
+**Create Run**
+```
+POST /api/v1/visual/baselines/{baselineId}/runs
+```
+
+**List Runs**
+```
+GET /api/v1/visual/baselines/{baselineId}/runs
+```
+
+**Get Run Details**
+```
+GET /api/v1/visual/baselines/{baselineId}/runs/{runId}
+
+Response includes:
+- mismatchPercentage, diffPixels
+- Signed URLs for baseline/current/diff images
+- aiJson (if AI insights enabled)
+```
+
+## Where to See Data in Supabase
+
+**Database (Table Editor):**
+1. Go to Supabase Dashboard → Database → Table Editor
+2. View tables:
+   - `visual_baselines` - All baseline metadata
+   - `visual_runs` - All run results with AI insights
+
+**Storage (Bucket Browser):**
+1. Go to Supabase Dashboard → Storage
+2. Browse `visual` bucket:
+   - `<projectId>/baselines/<baselineId>/baseline.png`
+   - `<projectId>/baselines/<baselineId>/runs/<runId>/current.png`
+   - `<projectId>/baselines/<baselineId>/runs/<runId>/diff.png`
+   - `<projectId>/baselines/<baselineId>/runs/<runId>/result.json`
+
+## Troubleshooting
+
+**"Rate limit exceeded"**
+- Wait 1 minute or increase `RATE_LIMIT_PER_MINUTE`
+
+**"URL not allowed" (SSRF error)**
+- Using localhost/private IP? Deploy to public URL
+- Set `ALLOWED_HOSTS` if you need specific whitelisting
+
+**Images not loading in UI**
+- Check Storage bucket is created and named `visual`
+- Verify `STORAGE_BUCKET` secret matches bucket name
+- Signed URLs expire after 6 hours (refresh the page)
+
+**AI insights not showing**
+- Set `OPENAI_API_KEY` in Edge Function secrets
+- Ensure `AI_ENABLED=true` (default)
+- Check Edge Function logs for OpenAI API errors
+
+**Screenshots failing**
+- Verify `BROWSERLESS_WS_ENDPOINT` is correct
+- Test Browserless connection manually
+- Check Browserless.io plan limits
+
+## Legacy Notes
 
 ### Run the API locally
 
@@ -167,57 +347,30 @@ In another terminal (web UI):
 
 ```bash
 npm run dev
-```
+## Legacy Notes
 
-Notes:
+The old Express.js server (`server/`) has been replaced with Supabase Edge Functions. 
+If you need to reference the old implementation, check git history before this migration.
 
-- The API listens on `http://localhost:8787` by default.
-- The Vite dev server proxies `/api/*` and `/storage/*` to the API automatically.
-- If you deploy the UI as a static site (GitHub Pages / static Vercel), you must deploy the API separately and configure the UI to call it (see below).
-- Playwright may require installing browsers once:
+**Migration changes:**
+- Local filesystem → Supabase Storage
+- Express + Node.js → Deno Edge Functions
+- Local Playwright → Remote browser (Browserless)
+- No authentication → Service role key (server-side only)
+- Added AI insights via OpenAI
+- Added SSRF protection + rate limiting
 
-```bash
-npx playwright install
-```
+## Contributing
 
-### Storage layout
+PRs welcome! Please ensure:
+- TypeScript strict mode passes
+- All tests pass (`npm test`)
+- Follow existing code style
+- Update README if adding features
 
-Artifacts are stored on local filesystem under:
+## License
 
-```
-./storage/visual/{projectId}/{baselineId}/baseline.png
-./storage/visual/{projectId}/{baselineId}/runs/{runId}/current.png
-./storage/visual/{projectId}/{baselineId}/runs/{runId}/diff.png
-./storage/visual/{projectId}/{baselineId}/runs/{runId}/result.json
-```
-
-Artifacts are served (dev/MVP) via:
-
-`GET /storage/visual/...`
-
-### API endpoints
-
-Base path: `/api/v1/visual`
-
-**📖 Full Figma Guide:** [docs/FIGMA_SETUP.md](docs/FIGMA_SETUP.md)
-
-#### (1) Create baseline (URL-based)
-
-```bash
-curl -X POST http://localhost:8787/api/v1/visual/baselines \
-  -H "Content-Type: application/json" \
-  -d '{
-    "projectId": "demo",
-    "name": "Example",
-    "url": "https://example.com",
-    "viewport": {"width": 1440, "height": 900}
-  }'
-```
-
-#### (1b) Create baseline (Figma-based) ✨
-
-```bash
-curl -X POST http://localhost:8787/api/v1/visual/baselines \
+MIT
   -H "Content-Type: application/json" \
   -d '{
     "projectId": "demo",
