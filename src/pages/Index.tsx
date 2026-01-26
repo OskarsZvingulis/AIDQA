@@ -54,6 +54,7 @@ export default function Index() {
   const [visualViewportWidth, setVisualViewportWidth] = useState('1440');
   const [visualViewportHeight, setVisualViewportHeight] = useState('900');
   const [visualBaselineId, setVisualBaselineId] = useState<string>('');
+  const [visualRunUrl, setVisualRunUrl] = useState<string>('');  // URL to compare against
   const [visualRunId, setVisualRunId] = useState<string>('');
   const [visualStatus, setVisualStatus] = useState<'PASS' | 'FAIL' | 'ERROR' | ''>('');
   const [visualMismatch, setVisualMismatch] = useState<number | null>(null);
@@ -130,6 +131,10 @@ export default function Index() {
       setVisualError('baselineId is required (create a baseline first)');
       return;
     }
+    if (!visualRunUrl || !visualRunUrl.trim()) {
+      setVisualError('Enter URL to compare against');
+      return;
+    }
     setVisualError(null);
     setVisualRunId('');
     setVisualStatus('');
@@ -143,7 +148,7 @@ export default function Index() {
       const res = await fetch(`${apiBase}/api/v1/visual/baselines/${visualBaselineId}/runs`, {
         method: 'POST',
         headers: getApiHeaders(),
-        body: JSON.stringify({}),
+        body: JSON.stringify({ url: visualRunUrl.trim() }),
       });
       const text = await res.text();
       if (!res.ok) throw new Error(text || `HTTP ${res.status}`);
@@ -290,6 +295,22 @@ export default function Index() {
                 placeholder="(created baselineId appears here)"
               />
             </div>
+          </div>
+
+          {visualBaselineId && (
+            <div className="space-y-2">
+              <Label htmlFor="visualRunUrl">Compare against URL</Label>
+              <Input
+                id="visualRunUrl"
+                value={visualRunUrl}
+                onChange={(e) => setVisualRunUrl(e.target.value)}
+                placeholder="https://..."
+                className="w-full"
+              />
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
             <Button onClick={handleCreateRun} disabled={visualLoading || !visualBaselineId}>
               Create run
             </Button>

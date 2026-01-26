@@ -131,10 +131,14 @@ export async function handleListBaselines(req: Request): Promise<Response> {
 // Run Handlers
 // ============================================================================
 
-export async function handleCreateRun(baselineId: string): Promise<Response> {
+export async function handleCreateRun(req: Request, baselineId: string): Promise<Response> {
   const supabase = getSupabaseServer();
 
   try {
+    // Parse request body for optional URL override
+    const body = await req.json().catch(() => ({}));
+    const runUrl = typeof body.url === 'string' && body.url.trim() ? body.url.trim() : null;
+
     // Fetch baseline
     const { data: baselineData, error: baselineError } = await supabase
       .from('visual_baselines')
@@ -148,16 +152,24 @@ export async function handleCreateRun(baselineId: string): Promise<Response> {
 
     const baseline = baselineData;
 
-    // SSRF check (baseline URL should already be validated, but double-check)
-    const urlCheck = isUrlSafe(baseline.url);
-    if (!urlCheck.safe) {
-      return jsonError('Baseline URL is not safe', 400);
+    // Determine which URL to capture for comparison
+    const defaultUrl = baseline.url || null;
+    const captureUrl = runUrl ?? defaultUrl;
+
+    if (!captureUrl) {
+      return jsonError('url is required for runs when baseline is Figma or when you want to compare against a different site', 400);
     }
 
-    // Capture current screenshot
-    console.log('[RUN] Capturing current screenshot for:', baseline.url);
+    // SSRF check on capture URL
+    const urlCheck = isUrlSafe(captureUrl);
+    if (!urlCheck.safe) {
+      return jsonError(urlCheck.error || 'URL not allowed', 400);
+    }
+
+    // Capture current screenshot from the specified URL
+    console.log('[RUN] Capturing current screenshot for:', captureUrl);
     const currentBytes = await captureScreenshot({
-      url: baseline.url,
+      url: captureUrl,
       viewport: baseline.viewport,
     });
 
@@ -190,14 +202,82 @@ export async function handleCreateRun(baselineId: string): Promise<Response> {
     const currentUrl = await getSignedUrl(currentPath);
     const diffUrl = diffPath ? await getSignedUrl(diffPath) : null;
 
-    // Generate AI insights (optional)
-    const aiInsights = await generateAIInsights({
-      baselineUrl,
-      currentUrl,
-      diffUrl,
-      mismatchPercentage: diffResult.mismatchPercentage,
-      diffPixels: diffResult.diffPixels,
-    });
+    // AI is REQUIRED - validate config first
+    const aiEnabled = Deno.env.get('AI_ENABLED') === 'true';
+    const openaiKey = Deno.env.get('OPENAI_API_KEY');
+    
+    console.log('[RUN] AI config check:', { aiEnabled, hasOpenAIKey: !!openaiKey });
+    
+    if (!aiEnabled || !openaiKey) {
+      console.error('[RUN] AI is REQUIRED but not configured', { aiEnabled, hasOpenAIKey: !!openaiKey });
+      
+      // Insert failed run into database
+      await supabase
+        .from('visual_runs')
+        .insert({
+          id: runId,
+          baseline_id: baselineId,
+          project_id: baseline.project_id,
+          status: 'failed',
+          mismatch_percentage: diffResult.mismatchPercentage,
+          diff_pixels: diffResult.diffPixels,
+          current_path: currentPath,
+          diff_path: diffPath,
+          result_path: resultPath,
+          current_source_url: captureUrl,
+          ai_json: { error: 'AI is REQUIRED but not configured', details: { aiEnabled, hasOpenAIKey: !!openaiKey } },
+        });
+      
+      return jsonError(`AI is REQUIRED but not configured. AI_ENABLED=${aiEnabled}, hasKey=${!!openaiKey}`, 500);
+    }
+
+    // Generate AI insights with timeout (REQUIRED)
+    console.log('[RUN] Generating AI insights (required)');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
+    let aiInsights;
+    try {
+      aiInsights = await generateAIInsights({
+        baselineUrl,
+        currentUrl,
+        diffUrl,
+        mismatchPercentage: diffResult.mismatchPercentage,
+        diffPixels: diffResult.diffPixels,
+        baselineSourceUrl: baseline.url ?? null,
+        currentSourceUrl: captureUrl,
+      });
+      
+      if (!aiInsights) {
+        throw new Error('AI insights generation returned null - check OPENAI_API_KEY and AI_ENABLED env vars');
+      }
+    } catch (e: any) {
+      clearTimeout(timeout);
+      const errorMsg = e?.message ?? String(e);
+      const errorStack = e?.stack ?? '';
+      console.error('[RUN] AI analysis failed (required):', errorMsg, errorStack);
+      
+      // Insert failed run into database
+      await supabase
+        .from('visual_runs')
+        .insert({
+          id: runId,
+          baseline_id: baselineId,
+          project_id: baseline.project_id,
+          status: 'failed',
+          mismatch_percentage: diffResult.mismatchPercentage,
+          diff_pixels: diffResult.diffPixels,
+          current_path: currentPath,
+          diff_path: diffPath,
+          result_path: resultPath,
+          current_source_url: captureUrl,
+          ai_json: { error: errorMsg, stack: errorStack },
+        });
+      
+      return jsonError(`AI analysis failed: ${errorMsg}`, 500);
+    } finally {
+      clearTimeout(timeout);
+    }
 
     // Upload result JSON
     const resultJson = {
@@ -224,6 +304,7 @@ export async function handleCreateRun(baselineId: string): Promise<Response> {
         current_path: currentPath,
         diff_path: diffPath,
         result_path: resultPath,
+        current_source_url: captureUrl,
         ai_json: aiInsights,
       })
       .select()
@@ -248,6 +329,11 @@ export async function handleCreateRun(baselineId: string): Promise<Response> {
       currentUrl,
       diffUrl,
       baselineUrl,
+      currentSourceUrl: captureUrl,
+      ai: {
+        enabled: true,
+        data: runData.ai_json,
+      },
     };
 
     return jsonResponse(run, 201);

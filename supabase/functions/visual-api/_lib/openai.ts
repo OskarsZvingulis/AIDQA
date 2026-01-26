@@ -3,7 +3,7 @@
 
 import type { AIInsights } from '../_lib/types.ts';
 
-const AI_ENABLED = Deno.env.get('AI_ENABLED') !== 'false'; // default true
+const AI_ENABLED = Deno.env.get('AI_ENABLED') === 'true'; // must be explicitly true
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 const OPENAI_MODEL = Deno.env.get('OPENAI_MODEL') || 'gpt-4o';
 
@@ -13,13 +13,23 @@ export async function generateAIInsights(opts: {
   diffUrl: string | null;
   mismatchPercentage: number;
   diffPixels: number;
+  baselineSourceUrl?: string | null;
+  currentSourceUrl?: string | null;
 }): Promise<AIInsights | null> {
+  // Log configuration for debugging
+  console.log('[AI] Config check:', { 
+    AI_ENABLED, 
+    hasKey: !!OPENAI_API_KEY,
+    model: OPENAI_MODEL 
+  });
+
   if (!AI_ENABLED || !OPENAI_API_KEY) {
-    console.log('[AI] Insights disabled (AI_ENABLED=false or no API key)');
-    return null;
+    const error = `AI disabled - AI_ENABLED=${AI_ENABLED}, hasKey=${!!OPENAI_API_KEY}`;
+    console.error('[AI]', error);
+    throw new Error(error);
   }
 
-  const { baselineUrl, currentUrl, diffUrl, mismatchPercentage, diffPixels } = opts;
+  const { baselineUrl, currentUrl, diffUrl, mismatchPercentage, diffPixels, baselineSourceUrl, currentSourceUrl } = opts;
 
   console.log('[AI] Generating insights for', { mismatchPercentage, diffPixels });
 
@@ -28,6 +38,9 @@ export async function generateAIInsights(opts: {
       role: 'system',
       content: `You are a design QA assistant analyzing visual regression test results. 
 Your job is to examine baseline, current, and diff screenshots to identify UX issues, layout problems, and visual inconsistencies.
+
+IMPORTANT: If the baseline and current screenshots appear to be completely different pages/products/websites (not just different versions of the same page), you MUST explicitly state this in your summary and verdict. Say something like: "These appear to be entirely different pages/websites, not intended to match" or "Baseline and current are unrelated products/pages".
+
 Provide actionable recommendations in a structured JSON format.`,
     },
     {
@@ -37,11 +50,14 @@ Provide actionable recommendations in a structured JSON format.`,
           type: 'text',
           text: `Analyze this visual regression test:
 - Mismatch: ${mismatchPercentage.toFixed(2)}% (${diffPixels} pixels)
+- Baseline source URL: ${baselineSourceUrl ?? 'unknown'}
+- Current source URL: ${currentSourceUrl ?? 'unknown'}
 - Baseline (expected): see image 1
 - Current (actual): see image 2
 ${diffUrl ? '- Diff highlights: see image 3' : ''}
 
-Identify layout shifts, spacing changes, typography issues, color mismatches, missing elements, overflow, or alignment problems.`,
+If the URLs are completely different domains/websites, state clearly that these are unrelated pages and not intended to match.
+Otherwise, identify layout shifts, spacing changes, typography issues, color mismatches, missing elements, overflow, or alignment problems.`,
         },
         {
           type: 'image_url',
@@ -86,8 +102,8 @@ Identify layout shifts, spacing changes, typography issues, color mismatches, mi
                 },
                 severity: {
                   type: 'string',
-                  enum: ['pass', 'minor', 'major'],
-                  description: 'Overall severity: pass (acceptable), minor (cosmetic), major (breaking)',
+                  enum: ['pass', 'minor', 'major', 'fail'],
+                  description: 'Overall severity: pass (acceptable), minor (cosmetic), major (breaking), fail (completely different pages)',
                 },
                 issues: {
                   type: 'array',
@@ -115,8 +131,12 @@ Identify layout shifts, spacing changes, typography issues, color mismatches, mi
                   items: { type: 'string' },
                   description: 'Quick actionable fixes',
                 },
+                verdict: {
+                  type: 'string',
+                  description: 'Final verdict: are these pages related? Same product/website or completely different?',
+                },
               },
-              required: ['summary', 'severity', 'issues', 'quickWins'],
+              required: ['summary', 'severity', 'issues', 'quickWins', 'verdict'],
               additionalProperties: false,
             },
           },
@@ -141,9 +161,9 @@ Identify layout shifts, spacing changes, typography issues, color mismatches, mi
     console.log('[AI] Generated insights:', insights.severity, insights.issues.length, 'issues');
 
     return insights;
-  } catch (error) {
+  } catch (error: any) {
     console.error('[AI] Failed to generate insights:', error);
-    // Return null instead of throwing - AI is optional
-    return null;
+    // AI is required - throw error instead of returning null
+    throw new Error(`OpenAI API failed: ${error.message || String(error)}`);
   }
 }

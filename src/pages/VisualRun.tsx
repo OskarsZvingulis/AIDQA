@@ -100,7 +100,7 @@ export default function VisualRun() {
             </Card>
 
             {/* AI Insights Panel */}
-            {data.aiJson && (
+            {data.aiJson && !data.aiJson.error && (
               <>
                 <Separator />
                 <Card className="p-6 space-y-4">
@@ -118,6 +118,13 @@ export default function VisualRun() {
                     <AlertTitle>Summary</AlertTitle>
                     <AlertDescription>{data.aiJson.summary}</AlertDescription>
                   </Alert>
+
+                  {data.aiJson.verdict && (
+                    <Alert>
+                      <AlertTitle>Verdict</AlertTitle>
+                      <AlertDescription>{data.aiJson.verdict}</AlertDescription>
+                    </Alert>
+                  )}
 
                   {data.aiJson.issues.length > 0 && (
                     <div className="space-y-3">
@@ -157,12 +164,23 @@ export default function VisualRun() {
               </>
             )}
 
+            {data.aiJson?.error && (
+              <>
+                <Separator />
+                <Card className="p-6 border-destructive">
+                  <p className="text-sm text-destructive font-medium">AI Analysis Failed</p>
+                  <p className="text-sm text-muted-foreground mt-2">{data.aiJson.error}</p>
+                </Card>
+              </>
+            )}
+
             {!data.aiJson && (
               <>
                 <Separator />
-                <Card className="p-6">
-                  <p className="text-sm text-muted-foreground">
-                    AI insights are disabled. Set OPENAI_API_KEY to enable AI-powered visual regression analysis.
+                <Card className="p-6 border-destructive">
+                  <p className="text-sm text-destructive font-medium">AI Missing</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    This run is missing AI insights (this should never happen). Contact support.
                   </p>
                 </Card>
               </>
