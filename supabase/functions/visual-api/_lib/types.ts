@@ -36,9 +36,10 @@ export interface Run {
 
 export interface AIInsights {
   summary: string;
-  severity: 'pass' | 'minor' | 'major';
+  severity: 'pass' | 'minor' | 'major' | 'fail';
   issues: AIIssue[];
   quickWins: string[];
+  verdict: string;
 }
 
 export interface AIIssue {

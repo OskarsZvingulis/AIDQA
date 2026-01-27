@@ -3,10 +3,6 @@
 
 import type { AIInsights } from '../_lib/types.ts';
 
-const AI_ENABLED = Deno.env.get('AI_ENABLED') === 'true'; // must be explicitly true
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-const OPENAI_MODEL = Deno.env.get('OPENAI_MODEL') || 'gpt-4o';
-
 export async function generateAIInsights(opts: {
   baselineUrl: string;
   currentUrl: string;
@@ -15,16 +11,18 @@ export async function generateAIInsights(opts: {
   diffPixels: number;
   baselineSourceUrl?: string | null;
   currentSourceUrl?: string | null;
-}): Promise<AIInsights | null> {
+}): Promise<AIInsights> {
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  const OPENAI_MODEL = Deno.env.get('OPENAI_MODEL') ?? 'gpt-4o-mini';
+
   // Log configuration for debugging
   console.log('[AI] Config check:', { 
-    AI_ENABLED, 
     hasKey: !!OPENAI_API_KEY,
     model: OPENAI_MODEL 
   });
 
-  if (!AI_ENABLED || !OPENAI_API_KEY) {
-    const error = `AI disabled - AI_ENABLED=${AI_ENABLED}, hasKey=${!!OPENAI_API_KEY}`;
+  if (!OPENAI_API_KEY) {
+    const error = 'OPENAI_API_KEY environment variable is required';
     console.error('[AI]', error);
     throw new Error(error);
   }

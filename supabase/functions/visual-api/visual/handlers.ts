@@ -202,36 +202,7 @@ export async function handleCreateRun(req: Request, baselineId: string): Promise
     const currentUrl = await getSignedUrl(currentPath);
     const diffUrl = diffPath ? await getSignedUrl(diffPath) : null;
 
-    // AI is REQUIRED - validate config first
-    const aiEnabled = Deno.env.get('AI_ENABLED') === 'true';
-    const openaiKey = Deno.env.get('OPENAI_API_KEY');
-    
-    console.log('[RUN] AI config check:', { aiEnabled, hasOpenAIKey: !!openaiKey });
-    
-    if (!aiEnabled || !openaiKey) {
-      console.error('[RUN] AI is REQUIRED but not configured', { aiEnabled, hasOpenAIKey: !!openaiKey });
-      
-      // Insert failed run into database
-      await supabase
-        .from('visual_runs')
-        .insert({
-          id: runId,
-          baseline_id: baselineId,
-          project_id: baseline.project_id,
-          status: 'failed',
-          mismatch_percentage: diffResult.mismatchPercentage,
-          diff_pixels: diffResult.diffPixels,
-          current_path: currentPath,
-          diff_path: diffPath,
-          result_path: resultPath,
-          current_source_url: captureUrl,
-          ai_json: { error: 'AI is REQUIRED but not configured', details: { aiEnabled, hasOpenAIKey: !!openaiKey } },
-        });
-      
-      return jsonError(`AI is REQUIRED but not configured. AI_ENABLED=${aiEnabled}, hasKey=${!!openaiKey}`, 500);
-    }
-
-    // Generate AI insights with timeout (REQUIRED)
+    // Generate AI insights (REQUIRED - will throw if OPENAI_API_KEY missing)
     console.log('[RUN] Generating AI insights (required)');
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
@@ -247,10 +218,6 @@ export async function handleCreateRun(req: Request, baselineId: string): Promise
         baselineSourceUrl: baseline.url ?? null,
         currentSourceUrl: captureUrl,
       });
-      
-      if (!aiInsights) {
-        throw new Error('AI insights generation returned null - check OPENAI_API_KEY and AI_ENABLED env vars');
-      }
     } catch (e: any) {
       clearTimeout(timeout);
       const errorMsg = e?.message ?? String(e);
