@@ -31,50 +31,101 @@ export async function generateAIInsights(opts: {
 
   console.log('[AI] Generating insights for', { mismatchPercentage, diffPixels });
 
-  const messages = [
+  const systemPrompt = `You are an expert visual QA engineer analyzing UI regression test results.
+
+CONTEXT:
+- You're comparing a BASELINE screenshot (reference/expected) vs CURRENT screenshot (actual)
+- A DIFF image highlights the changed pixels in red
+- Mismatch percentage: ${mismatchPercentage.toFixed(2)}%
+
+YOUR JOB:
+Identify SPECIFIC UI defects with precision. For each issue, state:
+
+1. WHAT changed (be specific with measurements if possible)
+   - "Logo shifted 10-15px to the right"
+   - "Button padding reduced from ~12px to ~8px"
+   - "Font changed from bold to regular weight"
+   - "Background color shifted from light gray to white"
+   
+2. WHERE on the page (location)
+   - "Header navigation bar"
+   - "Hero section CTA button"
+   - "Footer copyright text"
+
+3. SEVERITY:
+   - critical: Breaks functionality or brand identity (wrong logo, broken layout, text cutoff)
+   - major: Noticeable visual regression (spacing off, wrong colors, alignment issues)
+   - minor: Subtle differences (1-2px shifts, slight color variations)
+   - pass: No meaningful visual differences or expected changes
+
+4. RECOMMENDATION:
+   - "Restore 12px padding to match design system"
+   - "Use Roboto font family as specified in baseline"
+   - "Correct background color to #F5F5F5"
+
+IMPORTANT RULES:
+- If baseline and current are COMPLETELY DIFFERENT PAGES (not the same website/product), set severity to "critical" and state in summary: "These are unrelated pages, not a valid comparison"
+- For mismatch <0.1%: likely noise (anti-aliasing, compression), mark as "pass" unless you see clear visual issues
+- For mismatch 0.1-2%: likely minor styling changes
+- For mismatch >2%: likely major layout/content changes
+- Prioritize issues a human user would notice (ignore imperceptible pixel shifts)
+- DO NOT make up issues if you don't see them clearly in the images
+
+OUTPUT FORMAT (JSON):
+{
+  "summary": "Brief 1-sentence overview of findings",
+  "severity": "pass|minor|major|critical",
+  "issues": [
     {
-      role: 'system',
-      content: `You are a design QA assistant analyzing visual regression test results. 
-Your job is to examine baseline, current, and diff screenshots to identify UX issues, layout problems, and visual inconsistencies.
+      "title": "Specific issue name",
+      "location": "Where on page",
+      "type": "spacing|typography|color|layout|content",
+      "severity": "minor|major|critical",
+      "evidence": "What you see in the diff",
+      "recommendation": "How to fix it"
+    }
+  ],
+  "quickWins": ["Easy fix 1", "Easy fix 2"] // Only if issues exist
+}`;
 
-IMPORTANT: If the baseline and current screenshots appear to be completely different pages/products/websites (not just different versions of the same page), you MUST explicitly state this in your summary and verdict. Say something like: "These appear to be entirely different pages/websites, not intended to match" or "Baseline and current are unrelated products/pages".
+  const userContent: any[] = [
+    {
+      type: 'text',
+      text: `Analyze this visual regression test:
 
-Provide actionable recommendations in a structured JSON format.`,
+Mismatch: ${mismatchPercentage.toFixed(2)}% (${diffPixels} pixels)
+Baseline URL: ${baselineSourceUrl ?? 'unknown'}
+Current URL: ${currentSourceUrl ?? 'unknown'}
+
+Provide specific, actionable QA findings in JSON format.`,
     },
     {
-      role: 'user',
-      content: [
-        {
-          type: 'text',
-          text: `Analyze this visual regression test:
-- Mismatch: ${mismatchPercentage.toFixed(2)}% (${diffPixels} pixels)
-- Baseline source URL: ${baselineSourceUrl ?? 'unknown'}
-- Current source URL: ${currentSourceUrl ?? 'unknown'}
-- Baseline (expected): see image 1
-- Current (actual): see image 2
-${diffUrl ? '- Diff highlights: see image 3' : ''}
-
-If the URLs are completely different domains/websites, state clearly that these are unrelated pages and not intended to match.
-Otherwise, identify layout shifts, spacing changes, typography issues, color mismatches, missing elements, overflow, or alignment problems.`,
-        },
-        {
-          type: 'image_url',
-          image_url: { url: baselineUrl },
-        },
-        {
-          type: 'image_url',
-          image_url: { url: currentUrl },
-        },
-      ],
+      type: 'image_url',
+      image_url: { url: baselineUrl, detail: 'high' },
+    },
+    {
+      type: 'image_url',
+      image_url: { url: currentUrl, detail: 'high' },
     },
   ];
 
   if (diffUrl) {
-    messages[1].content.push({
+    userContent.push({
       type: 'image_url',
-      image_url: { url: diffUrl },
+      image_url: { url: diffUrl, detail: 'high' },
     });
   }
+
+  const messages = [
+    {
+      role: 'system',
+      content: systemPrompt,
+    },
+    {
+      role: 'user',
+      content: userContent,
+    },
+  ];
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -86,60 +137,58 @@ Otherwise, identify layout shifts, spacing changes, typography issues, color mis
       body: JSON.stringify({
         model: OPENAI_MODEL,
         messages,
+        max_tokens: 1500,
+        temperature: 0.3, // Lower = more precise/consistent
         response_format: {
           type: 'json_schema',
           json_schema: {
-            name: 'visual_regression_insights',
+            name: 'visual_qa_report',
             strict: true,
             schema: {
               type: 'object',
               properties: {
                 summary: {
                   type: 'string',
-                  description: 'Brief summary of what changed and overall assessment',
+                  description: 'Brief 1-sentence overview of findings',
                 },
                 severity: {
                   type: 'string',
-                  enum: ['pass', 'minor', 'major', 'fail'],
-                  description: 'Overall severity: pass (acceptable), minor (cosmetic), major (breaking), fail (completely different pages)',
+                  enum: ['pass', 'minor', 'major', 'critical'],
+                  description: 'Overall severity: pass, minor, major, or critical',
                 },
                 issues: {
                   type: 'array',
                   items: {
                     type: 'object',
                     properties: {
-                      title: { type: 'string' },
+                      title: { type: 'string', description: 'Specific issue name' },
+                      location: { type: 'string', description: 'Where on page' },
                       type: {
                         type: 'string',
-                        enum: ['layout', 'spacing', 'typography', 'color', 'missing_element', 'overflow', 'alignment', 'other'],
+                        enum: ['spacing', 'typography', 'color', 'layout', 'content', 'other'],
                       },
                       severity: {
                         type: 'string',
-                        enum: ['minor', 'major'],
+                        enum: ['minor', 'major', 'critical'],
                       },
-                      evidence: { type: 'string' },
-                      recommendation: { type: 'string' },
+                      evidence: { type: 'string', description: 'What you see in the diff' },
+                      recommendation: { type: 'string', description: 'How to fix it' },
                     },
-                    required: ['title', 'type', 'severity', 'evidence', 'recommendation'],
+                    required: ['title', 'location', 'type', 'severity', 'evidence', 'recommendation'],
                     additionalProperties: false,
                   },
                 },
                 quickWins: {
                   type: 'array',
                   items: { type: 'string' },
-                  description: 'Quick actionable fixes',
-                },
-                verdict: {
-                  type: 'string',
-                  description: 'Final verdict: are these pages related? Same product/website or completely different?',
+                  description: 'Quick actionable fixes (only if issues exist)',
                 },
               },
-              required: ['summary', 'severity', 'issues', 'quickWins', 'verdict'],
+              required: ['summary', 'severity', 'issues', 'quickWins'],
               additionalProperties: false,
             },
           },
         },
-        max_tokens: 2000,
       }),
     });
 

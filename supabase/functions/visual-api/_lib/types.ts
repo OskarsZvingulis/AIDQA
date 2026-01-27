@@ -36,16 +36,17 @@ export interface Run {
 
 export interface AIInsights {
   summary: string;
-  severity: 'pass' | 'minor' | 'major' | 'fail';
+  severity: 'pass' | 'minor' | 'major' | 'critical';
   issues: AIIssue[];
   quickWins: string[];
-  verdict: string;
+  verdict?: string;
 }
 
 export interface AIIssue {
   title: string;
-  type: 'layout' | 'spacing' | 'typography' | 'color' | 'missing_element' | 'overflow' | 'alignment' | 'other';
-  severity: 'minor' | 'major';
+  location?: string;
+  type: 'layout' | 'spacing' | 'typography' | 'color' | 'content' | 'other';
+  severity: 'minor' | 'major' | 'critical';
   evidence: string;
   recommendation: string;
 }

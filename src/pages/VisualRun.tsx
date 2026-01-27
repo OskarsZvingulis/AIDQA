@@ -8,18 +8,19 @@ import { getApiBaseUrl, getApiHeaders } from '@/lib/apiBase';
 
 type AIIssue = {
   title: string;
-  type: 'layout' | 'spacing' | 'typography' | 'color' | 'missing_element' | 'overflow' | 'alignment' | 'other';
-  severity: 'minor' | 'major';
+  location?: string;
+  type: 'layout' | 'spacing' | 'typography' | 'color' | 'content' | 'other';
+  severity: 'minor' | 'major' | 'critical';
   evidence: string;
   recommendation: string;
 };
 
 type AIInsights = {
   summary: string;
-  severity: 'pass' | 'minor' | 'major' | 'fail';
+  severity: 'pass' | 'minor' | 'major' | 'critical';
   issues: AIIssue[];
   quickWins: string[];
-  verdict: string;
+  verdict?: string;
 };
 
 type VisualRunResult = {
@@ -106,7 +107,7 @@ export default function VisualRun() {
                 <Separator />
                 <Card className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold">AI Insights</h2>
+                    <h2 className="text-xl font-semibold">AI Quality Analysis</h2>
                     <Badge variant={
                       data.aiJson.severity === 'pass' ? 'default' :
                       data.aiJson.severity === 'minor' ? 'secondary' : 'destructive'
@@ -115,10 +116,7 @@ export default function VisualRun() {
                     </Badge>
                   </div>
 
-                  <Alert>
-                    <AlertTitle>Summary</AlertTitle>
-                    <AlertDescription>{data.aiJson.summary}</AlertDescription>
-                  </Alert>
+                  <p className="text-sm text-muted-foreground">{data.aiJson.summary}</p>
 
                   {data.aiJson.verdict && (
                     <Alert>
@@ -129,23 +127,53 @@ export default function VisualRun() {
 
                   {data.aiJson.issues.length > 0 && (
                     <div className="space-y-3">
-                      <h3 className="font-semibold text-sm">Issues Detected ({data.aiJson.issues.length})</h3>
+                      <h3 className="font-medium text-sm">Issues Detected ({data.aiJson.issues.length})</h3>
                       {data.aiJson.issues.map((issue, idx) => (
-                        <Card key={idx} className="p-4 space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className="font-medium">{issue.title}</h4>
-                            <div className="flex gap-2">
-                              <Badge variant="outline">{issue.type}</Badge>
-                              <Badge variant={issue.severity === 'major' ? 'destructive' : 'secondary'}>
-                                {issue.severity}
-                              </Badge>
+                        <Card 
+                          key={idx} 
+                          className="p-4 border-l-4" 
+                          style={{
+                            borderLeftColor: 
+                              issue.severity === 'critical' ? '#ef4444' :
+                              issue.severity === 'major' ? '#f97316' : '#eab308'
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <Badge variant="outline" className="text-xs">
+                                  {issue.type}
+                                </Badge>
+                                <Badge 
+                                  variant={
+                                    issue.severity === 'critical' ? 'destructive' :
+                                    issue.severity === 'major' ? 'destructive' : 'secondary'
+                                  } 
+                                  className="text-xs"
+                                >
+                                  {issue.severity}
+                                </Badge>
+                              </div>
+                              <p className="font-medium text-sm">{issue.title}</p>
+                              {issue.location && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  📍 {issue.location}
+                                </p>
+                              )}
                             </div>
                           </div>
-                          <p className="text-sm text-muted-foreground">{issue.evidence}</p>
-                          <div className="pt-2 border-t">
-                            <p className="text-sm font-medium">Recommendation:</p>
-                            <p className="text-sm">{issue.recommendation}</p>
-                          </div>
+                          
+                          {issue.evidence && (
+                            <p className="text-xs text-muted-foreground mb-2 italic">
+                              &quot;{issue.evidence}&quot;
+                            </p>
+                          )}
+                          
+                          {issue.recommendation && (
+                            <p className="text-xs bg-blue-50 dark:bg-blue-950 p-2 rounded">
+                              💡 <strong>Fix:</strong> {issue.recommendation}
+                            </p>
+                          )}
                         </Card>
                       ))}
                     </div>
@@ -153,10 +181,17 @@ export default function VisualRun() {
 
                   {data.aiJson.quickWins.length > 0 && (
                     <div className="space-y-2">
-                      <h3 className="font-semibold text-sm">Quick Wins</h3>
-                      <ul className="list-disc list-inside space-y-1">
+                      <h3 className="font-medium text-sm">Quick Wins</h3>
+                      <ul className="text-xs space-y-1">
                         {data.aiJson.quickWins.map((win, idx) => (
-                          <li key={idx} className="text-sm">{win}</li>
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-green-600">✓</span>
+                            <span>{win}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                         ))}
                       </ul>
                     </div>
