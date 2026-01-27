@@ -192,10 +192,6 @@ export default function VisualRun() {
                       </ul>
                     </div>
                   )}
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </Card>
               </>
             )}
