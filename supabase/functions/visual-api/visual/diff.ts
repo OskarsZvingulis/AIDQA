@@ -22,26 +22,23 @@ export async function comparePngExact(
     );
   }
 
-  // Get raw RGBA bitmap data
-  const baselineData = new Uint8ClampedArray(baselineImg.bitmap.buffer);
-  const currentData = new Uint8ClampedArray(currentImg.bitmap.buffer);
+  // Get raw RGBA bitmap data (Image.bitmap is already Uint8ClampedArray)
+  const baselineData = baselineImg.bitmap;
+  const currentData = currentImg.bitmap;
 
-  // Create diff image
-  const diffImg = new Image(width, height);
-  const diffData = new Uint8ClampedArray(diffImg.bitmap.buffer);
-
-  // pixelmatch identifies which pixels differ — color is overridden by two-tone pass below
+  // Run pixelmatch into a temporary mask — used only to identify which pixels differ
+  const maskData = new Uint8ClampedArray(width * height * 4);
   const mismatchPixels = pixelmatch(
     baselineData,
     currentData,
-    diffData,
+    maskData,
     width,
     height,
     {
-      threshold: 0.1,        // 0-1, higher = more tolerant (0.1 = ignore <10% color diff)
-      alpha: 0.1,            // ignore alpha channel differences
-      includeAA: true,       // ignore anti-aliasing artifacts
-      diffColor: [255, 0, 0] // placeholder — overridden below
+      threshold: 0.1,
+      alpha: 0.1,
+      includeAA: true,
+      diffColor: [255, 255, 255] // doesn't matter, we only check alpha
     }
   );
 
@@ -50,37 +47,57 @@ export async function comparePngExact(
 
   let diffPngBytes: Uint8Array | null = null;
   if (mismatchPixels > 0) {
-    // Two-tone diff: green = baseline-only pixels, red = current-only pixels.
-    // pixelmatch flagged differing pixels with alpha > 0 in diffData.
-    // We walk those and assign color based on which source image has more visible content.
-    for (let i = 0; i < diffData.length; i += 4) {
-      if (diffData[i + 3] === 0) continue; // unchanged pixel, skip
+    // Two-tone diff: GREEN = baseline had content here, RED = current has content here
+    const diffImg = new Image(width, height);
+    const diffData = diffImg.bitmap; // Already Uint8ClampedArray
 
-      // Luminance of each source at this pixel (0 if fully transparent)
-      const bA = baselineData[i + 3];
-      const cA = currentData[i + 3];
-      const baselineLum = bA > 0
-        ? 0.299 * baselineData[i] + 0.587 * baselineData[i + 1] + 0.114 * baselineData[i + 2]
-        : 0;
-      const currentLum = cA > 0
-        ? 0.299 * currentData[i] + 0.587 * currentData[i + 1] + 0.114 * currentData[i + 2]
-        : 0;
-
-      if (baselineLum > currentLum) {
-        // Baseline pixel is more visible here → green
+    for (let i = 0; i < maskData.length; i += 4) {
+      if (maskData[i + 3] === 0) {
+        // Pixel unchanged — transparent
         diffData[i]     = 0;
-        diffData[i + 1] = 200;
-        diffData[i + 2] = 0;
-      } else {
-        // Current pixel is more visible here → red
-        diffData[i]     = 220;
         diffData[i + 1] = 0;
         diffData[i + 2] = 0;
+        diffData[i + 3] = 0;
+        continue;
       }
-      diffData[i + 3] = 200; // consistent alpha, visible but not fully opaque
+
+      // Both pixels exist (screenshots are fully opaque).
+      const bR = baselineData[i], bG = baselineData[i+1], bB = baselineData[i+2];
+      const cR = currentData[i],  cG = currentData[i+1],  cB = currentData[i+2];
+
+      // Distance between the two pixels
+      const dist = Math.abs(bR - cR) + Math.abs(bG - cG) + Math.abs(bB - cB);
+
+      if (dist < 30) {
+        // Very subtle difference (anti-aliasing / sub-pixel shift)
+        // Render as bright yellow — neutral indicator
+        diffData[i]     = 255;  // R
+        diffData[i + 1] = 230;  // G (bright yellow)
+        diffData[i + 2] = 0;    // B
+        diffData[i + 3] = 220;  // Alpha — highly visible
+      } else {
+        // Significant difference: one side is content (dark), other is background (bright)
+        const bBrightness = (bR + bG + bB) / 3;
+        const cBrightness = (cR + cG + cB) / 3;
+
+        if (bBrightness < cBrightness) {
+          // Baseline is darker = baseline HAD content here, current is background
+          // This is where something WAS → bright saturated GREEN
+          diffData[i]     = 0;    // R
+          diffData[i + 1] = 255;  // G (full saturation)
+          diffData[i + 2] = 50;   // B (slight cyan tint for visibility)
+          diffData[i + 3] = 240;  // Alpha — almost opaque
+        } else {
+          // Current is darker = current HAS content here, baseline is background
+          // This is where something IS NOW → bright saturated RED
+          diffData[i]     = 255;  // R (full saturation)
+          diffData[i + 1] = 0;    // G
+          diffData[i + 2] = 50;   // B (slight magenta tint for visibility)
+          diffData[i + 3] = 240;  // Alpha — almost opaque
+        }
+      }
     }
 
-    new Uint8ClampedArray(diffImg.bitmap.buffer).set(diffData);
     diffPngBytes = await diffImg.encode();
   }
 
