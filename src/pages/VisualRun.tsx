@@ -48,7 +48,7 @@ export default function VisualRun() {
     setError(null);
     setData(null);
 
-    fetch(`${apiBase}/api/v1/visual/baselines/${baselineId}/runs/${runId}`, {
+    fetch(`${apiBase}/baselines/${baselineId}/runs/${runId}`, {
       headers: getApiHeaders(),
     })
       .then(async (r) => {

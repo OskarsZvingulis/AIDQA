@@ -14,6 +14,52 @@ import { captureScreenshot } from './capture.ts';
 import { comparePngExact } from './diff.ts';
 import { generateAIInsights } from '../_lib/openai.ts';
 
+function filterAIIssues(
+  issues: unknown,
+  diffStats: { mismatchPercentage: number; diffPixels: number }
+): unknown {
+  if (!Array.isArray(issues)) return issues;
+
+  const layoutShift = diffStats.mismatchPercentage < 20 && diffStats.diffPixels > 10000;
+  if (!layoutShift) return issues;
+
+  return issues.map((issue: any) => {
+    const blob = [
+      issue?.title,
+      issue?.description,
+      issue?.evidence,
+      issue?.recommendation,
+      issue?.location,
+      issue?.details,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    const isDuplicationClaim =
+      blob.includes('duplicate') ||
+      blob.includes('duplicated') ||
+      blob.includes('appears twice') ||
+      blob.includes('shown twice') ||
+      blob.includes('repeated') ||
+      blob.includes('double text') ||
+      blob.includes('text duplication');
+
+    if (isDuplicationClaim) {
+      return {
+        ...issue,
+        type: 'layout',
+        severity: 'minor',
+        title: 'Layout shift detected',
+        evidence:
+          'Text moved between baseline and current; diff overlay can look like doubled text.',
+        recommendation: 'Check CSS/layout shifts (fonts, container width, flex/grid).',
+      };
+    }
+    return issue;
+  });
+}
+
 // ============================================================================
 // Baseline Handlers
 // ============================================================================
@@ -219,6 +265,13 @@ export async function handleCreateRun(req: Request, baselineId: string): Promise
         currentSourceUrl: captureUrl,
         duplicationAllowed: false,
       });
+      aiInsights = {
+        ...aiInsights,
+        issues: filterAIIssues(aiInsights?.issues, {
+          mismatchPercentage: diffResult.mismatchPercentage,
+          diffPixels: diffResult.diffPixels,
+        }),
+      };
     } catch (e: any) {
       clearTimeout(timeout);
       const errorMsg = e?.message ?? String(e);

@@ -72,7 +72,7 @@ export default function Index() {
 
       console.log('CREATE_BASELINE body =>', body);
 
-      const res = await fetch(`${apiBase}/api/v1/visual/baselines`, {
+      const res = await fetch(`${apiBase}/baselines`, {
         method: 'POST',
         headers: getApiHeaders(),
         body: JSON.stringify(body),
@@ -110,7 +110,7 @@ export default function Index() {
       if (!configCheck.valid) {
         throw new Error(configCheck.error);
       }
-      const res = await fetch(`${apiBase}/api/v1/visual/baselines/${visualBaselineId}/runs`, {
+      const res = await fetch(`${apiBase}/baselines/${visualBaselineId}/runs`, {
         method: 'POST',
         headers: getApiHeaders(),
         body: JSON.stringify({ url: visualRunUrl.trim() }),
@@ -186,6 +186,14 @@ export default function Index() {
               <Label htmlFor="visualName">Name</Label>
               <Input id="visualName" value={visualName} onChange={(e) => setVisualName(e.target.value)} />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="visualViewportWidth">Viewport W</Label>
+              <Input id="visualViewportWidth" value={visualViewportWidth} onChange={(e) => setVisualViewportWidth(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="visualViewportHeight">Viewport H</Label>
+              <Input id="visualViewportHeight" value={visualViewportHeight} onChange={(e) => setVisualViewportHeight(e.target.value)} />
+            </div>
             {!visualUseFigma ? (
               <div className="space-y-2 lg:col-span-2">
                 <Label htmlFor="visualUrl">URL</Label>
@@ -219,14 +227,6 @@ export default function Index() {
                 </div>
               </>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="visualViewportWidth">Viewport W</Label>
-              <Input id="visualViewportWidth" value={visualViewportWidth} onChange={(e) => setVisualViewportWidth(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="visualViewportHeight">Viewport H</Label>
-              <Input id="visualViewportHeight" value={visualViewportHeight} onChange={(e) => setVisualViewportHeight(e.target.value)} />
-            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

@@ -33,7 +33,7 @@ Deno.serve(async (req: Request) => {
       response = await handleGetRun(baselineId, runId);
     } else if (path.match(/\/baselines\/[\w-]+\/runs$/)) {
       const [, baselineId] = path.match(/\/baselines\/([\w-]+)\/runs$/)!;
-      response = req.method === 'POST' ? await handleCreateRun(baselineId) : await handleListRuns(baselineId);
+      response = req.method === 'POST' ? await handleCreateRun(req, baselineId) : await handleListRuns(baselineId);
     } else {
       return new Response(JSON.stringify({ error: 'Not found' }), {
         status: 404,
