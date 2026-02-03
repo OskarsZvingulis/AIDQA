@@ -217,6 +217,7 @@ export async function handleCreateRun(req: Request, baselineId: string): Promise
         diffPixels: diffResult.diffPixels,
         baselineSourceUrl: baseline.url ?? null,
         currentSourceUrl: captureUrl,
+        duplicationAllowed: false,
       });
     } catch (e: any) {
       clearTimeout(timeout);

@@ -30,7 +30,7 @@ export async function comparePngExact(
   const diffImg = new Image(width, height);
   const diffData = new Uint8ClampedArray(diffImg.bitmap.buffer);
 
-  // ✅ PERCEPTUAL DIFF with tolerance (ignores tiny color shifts + anti-aliasing)
+  // pixelmatch identifies which pixels differ — color is overridden by two-tone pass below
   const mismatchPixels = pixelmatch(
     baselineData,
     currentData,
@@ -41,7 +41,7 @@ export async function comparePngExact(
       threshold: 0.1,        // 0-1, higher = more tolerant (0.1 = ignore <10% color diff)
       alpha: 0.1,            // ignore alpha channel differences
       includeAA: true,       // ignore anti-aliasing artifacts
-      diffColor: [255, 0, 0] // red highlights for diffs
+      diffColor: [255, 0, 0] // placeholder — overridden below
     }
   );
 
@@ -50,10 +50,37 @@ export async function comparePngExact(
 
   let diffPngBytes: Uint8Array | null = null;
   if (mismatchPixels > 0) {
-    // Copy diffData back to diffImg bitmap
+    // Two-tone diff: green = baseline-only pixels, red = current-only pixels.
+    // pixelmatch flagged differing pixels with alpha > 0 in diffData.
+    // We walk those and assign color based on which source image has more visible content.
+    for (let i = 0; i < diffData.length; i += 4) {
+      if (diffData[i + 3] === 0) continue; // unchanged pixel, skip
+
+      // Luminance of each source at this pixel (0 if fully transparent)
+      const bA = baselineData[i + 3];
+      const cA = currentData[i + 3];
+      const baselineLum = bA > 0
+        ? 0.299 * baselineData[i] + 0.587 * baselineData[i + 1] + 0.114 * baselineData[i + 2]
+        : 0;
+      const currentLum = cA > 0
+        ? 0.299 * currentData[i] + 0.587 * currentData[i + 1] + 0.114 * currentData[i + 2]
+        : 0;
+
+      if (baselineLum > currentLum) {
+        // Baseline pixel is more visible here → green
+        diffData[i]     = 0;
+        diffData[i + 1] = 200;
+        diffData[i + 2] = 0;
+      } else {
+        // Current pixel is more visible here → red
+        diffData[i]     = 220;
+        diffData[i + 1] = 0;
+        diffData[i + 2] = 0;
+      }
+      diffData[i + 3] = 200; // consistent alpha, visible but not fully opaque
+    }
+
     new Uint8ClampedArray(diffImg.bitmap.buffer).set(diffData);
-    
-    // Encode as PNG
     diffPngBytes = await diffImg.encode();
   }
 
