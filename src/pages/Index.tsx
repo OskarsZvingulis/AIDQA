@@ -176,7 +176,7 @@ export default function Index() {
       
       // Redirect to run detail page if we got a runId
       if (runId) {
-        window.location.href = `/baselines/${baselineId}/runs/${runId}`;
+        window.location.href = `/runs/${runId}`;
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create monitor');
@@ -387,18 +387,7 @@ export default function Index() {
                 </Button>
               )}
 
-              {monitorId && (
-                <div className="space-y-3 pt-4 border-t">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="default" className="text-sm">
-                      ✓ Monitor Created
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Your monitor is now active. You'll be notified of any visual changes detected on {cadence} checks.
-                  </p>
-                </div>
-              )}
+              {/* Removed static "Monitor Created" message — creation redirects to run result */}
             </div>
           </Card>
         )}
