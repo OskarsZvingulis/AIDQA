@@ -279,26 +279,17 @@ export async function handleCreateDesignBaseline(req: Request): Promise<Response
   const supabase = getSupabaseServer();
 
   try {
-    const body: CreateDesignBaselineRequest = await req.json();
+    const body = await req.json();
     const {
-      projectId,
+      projectId = 'default',
       name,
-      sourceType,
       sourceUrl,
       viewport = { width: 1440, height: 900 },
     } = body;
 
     // Validation
-    if (!projectId || !name || !sourceType) {
-      return jsonError('projectId, name, and sourceType are required', 400);
-    }
-
-    if (sourceType !== 'url') {
-      return jsonError('Only sourceType "url" is supported at this time', 501);
-    }
-
-    if (!sourceUrl) {
-      return jsonError('sourceUrl is required for url source type', 400);
+    if (!name || !sourceUrl) {
+      return jsonError('name and sourceUrl are required', 400);
     }
 
     // SSRF protection
@@ -329,7 +320,7 @@ export async function handleCreateDesignBaseline(req: Request): Promise<Response
         id: baselineId,
         project_id: projectId,
         name,
-        source_type: sourceType,
+        source_type: 'url',
         snapshot_path: snapshotPath,
         viewport,
         approved: false,
@@ -354,7 +345,7 @@ export async function handleCreateDesignBaseline(req: Request): Promise<Response
       createdAt: data.created_at,
     };
 
-    return jsonResponse({ baselineId: baseline.id, baseline }, 201);
+    return jsonResponse({ baselineId: baseline.id, snapshotPath: baseline.snapshotPath }, 201);
   } catch (error: any) {
     console.error('[DESIGN_BASELINE] Create failed:', error);
     return jsonError(error.message || 'Failed to create design baseline', 500);
