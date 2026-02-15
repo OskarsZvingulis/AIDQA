@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getApiBaseUrl, validateApiConfig, getApiHeaders } from '@/lib/apiBase';
+import { supabase, VISUAL_BUCKET } from '@/lib/supabaseClient';
 
 type DevicePreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 
@@ -28,6 +29,11 @@ export default function Index() {
   const [cadence, setCadence] = useState<'hourly' | 'daily'>('daily');
   const [monitorId, setMonitorId] = useState<string>('');
   const [monitorMismatchPercentage, setMonitorMismatchPercentage] = useState<number | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [baselineImageUrl, setBaselineImageUrl] = useState<string | null>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [diffImageUrl, setDiffImageUrl] = useState<string | null>(null);
   
   // UI state
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +71,70 @@ export default function Index() {
       throw new Error('Viewport must be positive numbers');
     }
     return { width: Math.floor(width), height: Math.floor(height) };
+  };
+
+  const createSignedUrl = async (path: string | null): Promise<string | null> => {
+    if (!path) return null;
+    const { data, error } = await supabase.storage
+      .from(VISUAL_BUCKET)
+      .createSignedUrl(path, 60);
+
+    if (error) throw new Error(error.message || 'Failed to create signed URL');
+    return data?.signedUrl || null;
+  };
+
+  const loadLatestRunComparison = async (createdMonitorId: string) => {
+    setComparisonError(null);
+    setComparisonLoading(true);
+    setBaselineImageUrl(null);
+    setCurrentImageUrl(null);
+    setDiffImageUrl(null);
+
+    try {
+      const { data: runRows, error: runError } = await supabase
+        .from('visual_runs')
+        .select('mismatch_percentage,current_path,diff_path,baseline_id,created_at')
+        .eq('monitor_id', createdMonitorId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (runError) throw new Error(runError.message || 'Failed to load latest run');
+
+      const latestRun = runRows?.[0];
+      if (!latestRun) {
+        setComparisonError('No run result found for this monitor yet.');
+        return;
+      }
+
+      const mismatch = Number(latestRun.mismatch_percentage ?? 0);
+      if (Number.isFinite(mismatch)) {
+        setMonitorMismatchPercentage(mismatch);
+      }
+
+      const { data: baselineRows, error: baselineError } = await supabase
+        .from('design_baselines')
+        .select('snapshot_path')
+        .eq('id', latestRun.baseline_id)
+        .limit(1);
+
+      if (baselineError) throw new Error(baselineError.message || 'Failed to load baseline path');
+
+      const snapshotPath = baselineRows?.[0]?.snapshot_path || null;
+
+      const [signedBaseline, signedCurrent, signedDiff] = await Promise.all([
+        createSignedUrl(snapshotPath),
+        createSignedUrl(latestRun.current_path || null),
+        createSignedUrl(latestRun.diff_path || null),
+      ]);
+
+      setBaselineImageUrl(signedBaseline ?? (baselinePreviewUrl || null));
+      setCurrentImageUrl(signedCurrent);
+      setDiffImageUrl(signedDiff);
+    } catch (e) {
+      setComparisonError(e instanceof Error ? e.message : 'Failed to load comparison images');
+    } finally {
+      setComparisonLoading(false);
+    }
   };
 
   const handleCaptureBaseline = async () => {
@@ -143,6 +213,7 @@ export default function Index() {
 
   const handleStartMonitoring = async () => {
     setError(null);
+    setComparisonError(null);
     setMonitorLoading(true);
     try {
       if (!targetUrl.trim()) {
@@ -178,6 +249,7 @@ export default function Index() {
 
       setMonitorId(id);
       setMonitorMismatchPercentage(mismatchPercentage);
+      await loadLatestRunComparison(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create monitor');
     } finally {
@@ -398,6 +470,55 @@ export default function Index() {
                         : 'Visual drift detected'}
                     </p>
                   </div>
+                </Card>
+              )}
+
+              {comparisonLoading && (
+                <Card className="p-4 border">
+                  <p className="text-sm text-muted-foreground">Loading comparison images...</p>
+                </Card>
+              )}
+
+              {comparisonError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{comparisonError}</AlertDescription>
+                </Alert>
+              )}
+
+              {(baselineImageUrl || currentImageUrl || diffImageUrl || monitorMismatchPercentage !== null) && !comparisonLoading && (
+                <Card className="p-4 border space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="border rounded overflow-hidden">
+                      <p className="p-2 text-sm font-medium">Baseline</p>
+                      {baselineImageUrl ? (
+                        <img src={baselineImageUrl} alt="Baseline" className="w-full h-auto" />
+                      ) : (
+                        <div className="p-6 text-sm text-muted-foreground">No baseline image</div>
+                      )}
+                    </div>
+
+                    <div className="border rounded overflow-hidden">
+                      <p className="p-2 text-sm font-medium">Current</p>
+                      {currentImageUrl ? (
+                        <img src={currentImageUrl} alt="Current" className="w-full h-auto" />
+                      ) : (
+                        <div className="p-6 text-sm text-muted-foreground">No current image</div>
+                      )}
+                    </div>
+
+                    <div className="border rounded overflow-hidden">
+                      <p className="p-2 text-sm font-medium">Diff</p>
+                      {diffImageUrl ? (
+                        <img src={diffImageUrl} alt="Diff" className="w-full h-auto" />
+                      ) : (
+                        <div className="p-6 text-sm text-muted-foreground">No diff image</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {monitorMismatchPercentage === 0 && (
+                    <p className="text-sm text-muted-foreground">No visual differences detected</p>
+                  )}
                 </Card>
               )}
             </div>
