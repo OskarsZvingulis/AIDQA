@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,11 +25,15 @@ export default function Index() {
   const [baselineApproved, setBaselineApproved] = useState(false);
   
   // Step 2: Create Monitor
-  const [targetUrl, setTargetUrl] = useState('');
+  const [targetUrl, setTargetUrl] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem('aidqa_target_url') || '';
+  });
   const [cadence, setCadence] = useState<'hourly' | 'daily'>('daily');
   const [monitorId, setMonitorId] = useState<string>('');
   const [monitorMismatchPercentage, setMonitorMismatchPercentage] = useState<number | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonStatusMessage, setComparisonStatusMessage] = useState<string | null>(null);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [baselineImageUrl, setBaselineImageUrl] = useState<string | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
@@ -42,6 +46,10 @@ export default function Index() {
   const [monitorLoading, setMonitorLoading] = useState(false);
   
   const apiBase = getApiBaseUrl();
+
+  useEffect(() => {
+    localStorage.setItem('aidqa_target_url', targetUrl);
+  }, [targetUrl]);
 
   const handleDeviceChange = (value: DevicePreset) => {
     setDevicePreset(value);
@@ -84,6 +92,7 @@ export default function Index() {
   };
 
   const loadLatestRunComparison = async (createdMonitorId: string) => {
+    setComparisonStatusMessage('Generating comparison...');
     setComparisonError(null);
     setComparisonLoading(true);
     setBaselineImageUrl(null);
@@ -91,18 +100,24 @@ export default function Index() {
     setDiffImageUrl(null);
 
     try {
-      const { data: runRows, error: runError } = await supabase
+      const { data: latestRun, error: runError } = await supabase
         .from('visual_runs')
-        .select('mismatch_percentage,current_path,diff_path,baseline_id,created_at')
+        .select('*')
         .eq('monitor_id', createdMonitorId)
         .order('created_at', { ascending: false })
-        .limit(1);
+        .limit(1)
+        .single();
 
-      if (runError) throw new Error(runError.message || 'Failed to load latest run');
+      if (runError) {
+        if (runError.code === 'PGRST116') {
+          setComparisonStatusMessage('Run failed to generate result');
+          return;
+        }
+        throw new Error(runError.message || 'Failed to load latest run');
+      }
 
-      const latestRun = runRows?.[0];
       if (!latestRun) {
-        setComparisonError('No run result found for this monitor yet.');
+        setComparisonStatusMessage('Run failed to generate result');
         return;
       }
 
@@ -130,7 +145,9 @@ export default function Index() {
       setBaselineImageUrl(signedBaseline ?? (baselinePreviewUrl || null));
       setCurrentImageUrl(signedCurrent);
       setDiffImageUrl(signedDiff);
+      setComparisonStatusMessage(null);
     } catch (e) {
+      setComparisonStatusMessage(null);
       setComparisonError(e instanceof Error ? e.message : 'Failed to load comparison images');
     } finally {
       setComparisonLoading(false);
@@ -213,6 +230,7 @@ export default function Index() {
 
   const handleStartMonitoring = async () => {
     setError(null);
+    setComparisonStatusMessage(null);
     setComparisonError(null);
     setMonitorLoading(true);
     try {
@@ -475,7 +493,13 @@ export default function Index() {
 
               {comparisonLoading && (
                 <Card className="p-4 border">
-                  <p className="text-sm text-muted-foreground">Loading comparison images...</p>
+                  <p className="text-sm text-muted-foreground">Generating comparison...</p>
+                </Card>
+              )}
+
+              {comparisonStatusMessage && !comparisonLoading && (
+                <Card className="p-4 border">
+                  <p className="text-sm text-muted-foreground">{comparisonStatusMessage}</p>
                 </Card>
               )}
 
@@ -485,9 +509,9 @@ export default function Index() {
                 </Alert>
               )}
 
-              {(baselineImageUrl || currentImageUrl || diffImageUrl || monitorMismatchPercentage !== null) && !comparisonLoading && (
+              {(baselineImageUrl || currentImageUrl || diffImageUrl || monitorMismatchPercentage !== null) && !comparisonLoading && !comparisonStatusMessage && (
                 <Card className="p-4 border space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className={`grid grid-cols-1 ${monitorMismatchPercentage === 0 || !diffImageUrl ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-4`}>
                     <div className="border rounded overflow-hidden">
                       <p className="p-2 text-sm font-medium">Baseline</p>
                       {baselineImageUrl ? (
@@ -506,17 +530,15 @@ export default function Index() {
                       )}
                     </div>
 
-                    <div className="border rounded overflow-hidden">
-                      <p className="p-2 text-sm font-medium">Diff</p>
-                      {diffImageUrl ? (
+                    {!(monitorMismatchPercentage === 0 || !diffImageUrl) && (
+                      <div className="border rounded overflow-hidden">
+                        <p className="p-2 text-sm font-medium">Diff</p>
                         <img src={diffImageUrl} alt="Diff" className="w-full h-auto" />
-                      ) : (
-                        <div className="p-6 text-sm text-muted-foreground">No diff image</div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
-                  {monitorMismatchPercentage === 0 && (
+                  {(monitorMismatchPercentage === 0 || !diffImageUrl) && (
                     <p className="text-sm text-muted-foreground">No visual differences detected</p>
                   )}
                 </Card>
