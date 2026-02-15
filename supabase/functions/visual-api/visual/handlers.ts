@@ -475,7 +475,32 @@ export async function handleCreateMonitor(req: Request): Promise<Response> {
     };
 
     console.log('[MONITOR] Created:', monitor.id);
-    return jsonResponse({ monitorId: monitor.id, monitor }, 201);
+
+    // 4. Trigger immediate first run
+    try {
+      const runResult = await runMonitor(data.id);
+      
+      // Calculate severity based on mismatch percentage
+      let severity: 'none' | 'low' | 'medium' | 'high' = 'none';
+      if (runResult.mismatchPercentage > 5) severity = 'high';
+      else if (runResult.mismatchPercentage > 1) severity = 'medium';
+      else if (runResult.mismatchPercentage > 0) severity = 'low';
+
+      return jsonResponse({
+        monitorId: monitor.id,
+        runId: runResult.runId,
+        mismatchPercentage: runResult.mismatchPercentage,
+        severity,
+      }, 201);
+    } catch (runError: any) {
+      console.error('[MONITOR] First run failed:', runError);
+      // Return monitor creation success but indicate run failure
+      return jsonResponse({
+        monitorId: monitor.id,
+        runId: null,
+        error: runError.message || 'Monitor created but first run failed',
+      }, 201);
+    }
   } catch (error: any) {
     console.error('[MONITOR] Create failed:', error);
     return jsonError(error.message || 'Failed to create monitor', 500);
@@ -995,6 +1020,152 @@ export async function handleRunJob(jobId: string): Promise<Response> {
   }
 }
 
+/**
+ * Execute a monitor run: capture screenshot, compare, save results
+ * @param monitorId - Monitor ID to execute
+ * @returns Run result with runId and mismatch percentage
+ */
+async function runMonitor(monitorId: string): Promise<{ runId: string; mismatchPercentage: number; aiStatus: string }> {
+  const supabase = getSupabaseServer();
+
+  // Fetch monitor
+  const { data: monitor, error: monitorError } = await supabase
+    .from('monitors')
+    .select('*')
+    .eq('id', monitorId)
+    .single();
+
+  if (monitorError || !monitor) {
+    throw new Error('Monitor not found');
+  }
+
+  // Fetch approved baseline
+  const { data: baseline, error: baselineError } = await supabase
+    .from('design_baselines')
+    .select('*')
+    .eq('id', monitor.baseline_id)
+    .eq('approved', true)
+    .single();
+
+  if (baselineError || !baseline) {
+    throw new Error('Approved baseline not found');
+  }
+
+  // Download baseline snapshot
+  const baselineBytes = await downloadFile(baseline.snapshot_path);
+
+  // Capture current screenshot from target_url
+  console.log('[RUN_MONITOR] Capturing screenshot for monitor:', monitor.id, 'url:', monitor.target_url);
+  const currentBytes = await captureScreenshot({
+    url: monitor.target_url,
+    viewport: baseline.viewport,
+    captureSettings: {},
+  });
+
+  // Run pixel diff
+  const diffResult = await comparePngExact(baselineBytes, currentBytes, {
+    ignoreRegions: [],
+    diffThresholdPct: 0.2,
+  });
+
+  // Generate run ID and storage paths
+  const runId = crypto.randomUUID();
+  const currentPath = `${monitor.project_id}/monitors/${monitor.id}/runs/${runId}/current.png`;
+  const diffPath = diffResult.diffPngBytes
+    ? `${monitor.project_id}/monitors/${monitor.id}/runs/${runId}/diff.png`
+    : null;
+  const resultPath = `${monitor.project_id}/monitors/${monitor.id}/runs/${runId}/result.json`;
+
+  // Upload screenshots
+  await uploadFile(currentPath, currentBytes, 'image/png');
+  if (diffResult.diffPngBytes && diffPath) {
+    await uploadFile(diffPath, diffResult.diffPngBytes, 'image/png');
+  }
+
+  // Generate signed URLs for AI analysis
+  const baselineUrl = await getSignedUrl(baseline.snapshot_path);
+  const currentUrl = await getSignedUrl(currentPath);
+  const diffUrl = diffPath ? await getSignedUrl(diffPath) : null;
+
+  // AI analysis (optional, async, non-blocking)
+  const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  let aiInsights: any = null;
+  let aiStatus: 'skipped' | 'completed' | 'failed' = 'skipped';
+  let aiError: string | null = null;
+
+  if (OPENAI_API_KEY) {
+    try {
+      aiInsights = await generateAIInsights({
+        baselineUrl,
+        currentUrl,
+        diffUrl,
+        mismatchPercentage: diffResult.mismatchPercentage,
+        diffPixels: diffResult.diffPixels,
+        baselineSourceUrl: monitor.target_url,
+        currentSourceUrl: monitor.target_url,
+        duplicationAllowed: false,
+      });
+      aiInsights = {
+        ...aiInsights,
+        issues: filterAIIssues(aiInsights?.issues, {
+          mismatchPercentage: diffResult.mismatchPercentage,
+          diffPixels: diffResult.diffPixels,
+        }),
+      };
+      aiStatus = 'completed';
+    } catch (e: any) {
+      aiStatus = 'failed';
+      aiError = e?.message ?? String(e);
+      aiInsights = { error: aiError };
+      console.warn('[RUN_MONITOR] AI analysis failed for monitor:', monitor.id, aiError);
+    }
+  }
+
+  // Upload result JSON
+  const resultJson = {
+    mismatchPercentage: diffResult.mismatchPercentage,
+    diffPixels: diffResult.diffPixels,
+    baselineUrl,
+    currentUrl,
+    diffUrl,
+    ai: aiInsights,
+  };
+  await uploadFile(resultPath, new TextEncoder().encode(JSON.stringify(resultJson, null, 2)), 'application/json');
+
+  // Insert run into visual_runs table
+  const { data: runData, error: runError } = await supabase
+    .from('visual_runs')
+    .insert({
+      id: runId,
+      baseline_id: monitor.baseline_id,
+      project_id: monitor.project_id,
+      status: 'completed',
+      mismatch_percentage: diffResult.mismatchPercentage,
+      diff_pixels: diffResult.diffPixels,
+      current_path: currentPath,
+      diff_path: diffPath,
+      result_path: resultPath,
+      current_source_url: monitor.target_url,
+      ai_json: aiInsights,
+      ai_status: aiStatus,
+      ai_error: aiError,
+    })
+    .select()
+    .single();
+
+  if (runError) {
+    throw new Error(`Failed to insert run: ${runError.message}`);
+  }
+
+  console.log('[RUN_MONITOR] Monitor run completed:', monitor.id, 'runId:', runId);
+  
+  return {
+    runId: runData.id,
+    mismatchPercentage: diffResult.mismatchPercentage,
+    aiStatus,
+  };
+}
+
 export async function handleCronTick(): Promise<Response> {
   const supabase = getSupabaseServer();
 
@@ -1023,135 +1194,17 @@ export async function handleCronTick(): Promise<Response> {
       
       try {
         console.log('[CRON] Processing monitor:', monitor.id);
-
-        // Fetch approved baseline
-        const { data: baseline, error: baselineError } = await supabase
-          .from('design_baselines')
-          .select('*')
-          .eq('id', monitor.baseline_id)
-          .eq('approved', true)
-          .single();
-
-        if (baselineError || !baseline) {
-          throw new Error('Approved baseline not found');
-        }
-
-        // Download baseline snapshot
-        const baselineBytes = await downloadFile(baseline.snapshot_path);
-
-        // Capture current screenshot from target_url
-        console.log('[CRON] Capturing screenshot for monitor:', monitor.id, 'url:', monitor.target_url);
-        const currentBytes = await captureScreenshot({
-          url: monitor.target_url,
-          viewport: baseline.viewport,
-          captureSettings: {},
-        });
-
-        // Run pixel diff
-        const diffResult = await comparePngExact(baselineBytes, currentBytes, {
-          ignoreRegions: [],
-          diffThresholdPct: 0.2,
-        });
-
-        // Generate run ID and storage paths
-        const runId = crypto.randomUUID();
-        const currentPath = `${monitor.project_id}/monitors/${monitor.id}/runs/${runId}/current.png`;
-        const diffPath = diffResult.diffPngBytes
-          ? `${monitor.project_id}/monitors/${monitor.id}/runs/${runId}/diff.png`
-          : null;
-        const resultPath = `${monitor.project_id}/monitors/${monitor.id}/runs/${runId}/result.json`;
-
-        // Upload screenshots
-        await uploadFile(currentPath, currentBytes, 'image/png');
-        if (diffResult.diffPngBytes && diffPath) {
-          await uploadFile(diffPath, diffResult.diffPngBytes, 'image/png');
-        }
-
-        // Generate signed URLs for AI analysis
-        const baselineUrl = await getSignedUrl(baseline.snapshot_path);
-        const currentUrl = await getSignedUrl(currentPath);
-        const diffUrl = diffPath ? await getSignedUrl(diffPath) : null;
-
-        // AI analysis (optional, async, non-blocking)
-        const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-        let aiInsights: any = null;
-        let aiStatus: 'skipped' | 'completed' | 'failed' = 'skipped';
-        let aiError: string | null = null;
-
-        if (OPENAI_API_KEY) {
-          try {
-            aiInsights = await generateAIInsights({
-              baselineUrl,
-              currentUrl,
-              diffUrl,
-              mismatchPercentage: diffResult.mismatchPercentage,
-              diffPixels: diffResult.diffPixels,
-              baselineSourceUrl: monitor.target_url,
-              currentSourceUrl: monitor.target_url,
-              duplicationAllowed: false,
-            });
-            aiInsights = {
-              ...aiInsights,
-              issues: filterAIIssues(aiInsights?.issues, {
-                mismatchPercentage: diffResult.mismatchPercentage,
-                diffPixels: diffResult.diffPixels,
-              }),
-            };
-            aiStatus = 'completed';
-          } catch (e: any) {
-            aiStatus = 'failed';
-            aiError = e?.message ?? String(e);
-            aiInsights = { error: aiError };
-            console.warn('[CRON] AI analysis failed for monitor:', monitor.id, aiError);
-          }
-        }
-
-        // Upload result JSON
-        const resultJson = {
-          mismatchPercentage: diffResult.mismatchPercentage,
-          diffPixels: diffResult.diffPixels,
-          baselineUrl,
-          currentUrl,
-          diffUrl,
-          ai: aiInsights,
-        };
-        await uploadFile(resultPath, new TextEncoder().encode(JSON.stringify(resultJson, null, 2)), 'application/json');
-
-        // Insert run into visual_runs table
-        const { data: runData, error: runError } = await supabase
-          .from('visual_runs')
-          .insert({
-            id: runId,
-            baseline_id: monitor.baseline_id,
-            project_id: monitor.project_id,
-            status: 'completed',
-            mismatch_percentage: diffResult.mismatchPercentage,
-            diff_pixels: diffResult.diffPixels,
-            current_path: currentPath,
-            diff_path: diffPath,
-            result_path: resultPath,
-            current_source_url: monitor.target_url,
-            ai_json: aiInsights,
-            ai_status: aiStatus,
-            ai_error: aiError,
-          })
-          .select()
-          .single();
-
-        if (runError) {
-          throw new Error(`Failed to insert run: ${runError.message}`);
-        }
-
+        
+        const runResult = await runMonitor(monitor.id);
+        
         results.succeeded++;
         results.runs.push({
           monitorId: monitor.id,
-          runId: runData.id,
+          runId: runResult.runId,
           status: 'success',
-          mismatchPercentage: diffResult.mismatchPercentage,
-          aiStatus,
+          mismatchPercentage: runResult.mismatchPercentage,
+          aiStatus: runResult.aiStatus,
         });
-
-        console.log('[CRON] Monitor run completed:', monitor.id, 'runId:', runId);
       } catch (e: any) {
         results.failed++;
         results.runs.push({

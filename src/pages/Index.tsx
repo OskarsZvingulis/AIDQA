@@ -169,10 +169,17 @@ export default function Index() {
       }
 
       const json = await res.json();
-      const id = json.monitorId ?? json.monitor?.id;
+      const id = json.monitorId;
+      const runId = json.runId;
+      
       if (!id) throw new Error('Invalid response: missing monitorId');
 
       setMonitorId(id);
+      
+      // Redirect to run detail page if we got a runId
+      if (runId) {
+        window.location.href = `/baselines/${baselineId}/runs/${runId}`;
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create monitor');
     } finally {
