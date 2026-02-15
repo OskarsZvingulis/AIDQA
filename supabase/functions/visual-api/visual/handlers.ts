@@ -313,6 +313,9 @@ export async function handleCreateDesignBaseline(req: Request): Promise<Response
     // 3. Upload to Supabase Storage
     await uploadFile(snapshotPath, screenshotBytes, 'image/png');
 
+    // Generate signed preview URL for the uploaded snapshot
+    const previewUrl = await getSignedUrl(snapshotPath);
+
     // 4. Insert into design_baselines table
     const { data, error } = await supabase
       .from('design_baselines')
@@ -345,7 +348,7 @@ export async function handleCreateDesignBaseline(req: Request): Promise<Response
       createdAt: data.created_at,
     };
 
-    return jsonResponse({ baselineId: baseline.id, snapshotPath: baseline.snapshotPath }, 201);
+    return jsonResponse({ baselineId: baseline.id, previewUrl }, 201);
   } catch (error: any) {
     console.error('[DESIGN_BASELINE] Create failed:', error);
     return jsonError(error.message || 'Failed to create design baseline', 500);

@@ -106,13 +106,11 @@ export default function Index() {
 
       const json = await res.json();
       const id = json.baselineId ?? json.baseline?.id;
+      const previewUrl = json.previewUrl ?? null;
       if (!id) throw new Error('Invalid response: missing baselineId');
 
       setBaselineId(id);
-      
-      // Get preview URL from storage
-      const previewUrl = `${apiBase.replace('/visual-api', '')}/storage/v1/object/public/visual-regression/demo/baselines/${id}/baseline.png`;
-      setBaselinePreviewUrl(previewUrl);
+      if (previewUrl) setBaselinePreviewUrl(previewUrl);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to capture baseline');
     } finally {
