@@ -482,18 +482,12 @@ export async function handleCreateMonitor(req: Request): Promise<Response> {
     // 4. Trigger immediate first run
     try {
       const runResult = await runMonitor(data.id);
-      
-      // Calculate severity based on mismatch percentage
-      let severity: 'none' | 'low' | 'medium' | 'high' = 'none';
-      if (runResult.mismatchPercentage > 5) severity = 'high';
-      else if (runResult.mismatchPercentage > 1) severity = 'medium';
-      else if (runResult.mismatchPercentage > 0) severity = 'low';
 
       return jsonResponse({
         monitorId: monitor.id,
         runId: runResult.runId,
         mismatchPercentage: runResult.mismatchPercentage,
-        severity,
+        severity: runResult.severity,
       }, 201);
     } catch (runError: any) {
       console.error('[MONITOR] First run failed:', runError);
@@ -1090,39 +1084,11 @@ async function runMonitor(monitorId: string): Promise<{ runId: string; mismatchP
   const currentUrl = await getSignedUrl(currentPath);
   const diffUrl = diffPath ? await getSignedUrl(diffPath) : null;
 
-  // AI analysis (optional, async, non-blocking)
   const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+  // Do not block on AI; start async update after inserting run
   let aiInsights: any = null;
   let aiStatus: 'skipped' | 'completed' | 'failed' = 'skipped';
   let aiError: string | null = null;
-
-  if (OPENAI_API_KEY) {
-    try {
-      aiInsights = await generateAIInsights({
-        baselineUrl,
-        currentUrl,
-        diffUrl,
-        mismatchPercentage: diffResult.mismatchPercentage,
-        diffPixels: diffResult.diffPixels,
-        baselineSourceUrl: monitor.target_url,
-        currentSourceUrl: monitor.target_url,
-        duplicationAllowed: false,
-      });
-      aiInsights = {
-        ...aiInsights,
-        issues: filterAIIssues(aiInsights?.issues, {
-          mismatchPercentage: diffResult.mismatchPercentage,
-          diffPixels: diffResult.diffPixels,
-        }),
-      };
-      aiStatus = 'completed';
-    } catch (e: any) {
-      aiStatus = 'failed';
-      aiError = e?.message ?? String(e);
-      aiInsights = { error: aiError };
-      console.warn('[RUN_MONITOR] AI analysis failed for monitor:', monitor.id, aiError);
-    }
-  }
 
   // Upload result JSON
   const resultJson = {
@@ -1135,11 +1101,19 @@ async function runMonitor(monitorId: string): Promise<{ runId: string; mismatchP
   };
   await uploadFile(resultPath, new TextEncoder().encode(JSON.stringify(resultJson, null, 2)), 'application/json');
 
-  // Insert run into visual_runs table
+  // Determine severity
+  let severity: 'minor' | 'warning' | 'critical' = 'minor';
+  const mismatch = diffResult.mismatchPercentage;
+  if (mismatch < 2) severity = 'minor';
+  else if (mismatch <= 10) severity = 'warning';
+  else severity = 'critical';
+
+  // Insert run into visual_runs table (do not wait for AI)
   const { data: runData, error: runError } = await supabase
     .from('visual_runs')
     .insert({
       id: runId,
+      monitor_id: monitor.id,
       baseline_id: monitor.baseline_id,
       project_id: monitor.project_id,
       status: 'completed',
@@ -1148,10 +1122,11 @@ async function runMonitor(monitorId: string): Promise<{ runId: string; mismatchP
       current_path: currentPath,
       diff_path: diffPath,
       result_path: resultPath,
+      severity,
       current_source_url: monitor.target_url,
-      ai_json: aiInsights,
-      ai_status: aiStatus,
-      ai_error: aiError,
+      ai_json: null,
+      ai_status: 'skipped',
+      ai_error: null,
     })
     .select()
     .single();
@@ -1161,11 +1136,46 @@ async function runMonitor(monitorId: string): Promise<{ runId: string; mismatchP
   }
 
   console.log('[RUN_MONITOR] Monitor run completed:', monitor.id, 'runId:', runId);
-  
+
+  // Kick off AI analysis asynchronously (do not block)
+  if (OPENAI_API_KEY) {
+    (async () => {
+      try {
+        const insights = await generateAIInsights({
+          baselineUrl,
+          currentUrl,
+          diffUrl,
+          mismatchPercentage: diffResult.mismatchPercentage,
+          diffPixels: diffResult.diffPixels,
+          baselineSourceUrl: monitor.target_url,
+          currentSourceUrl: monitor.target_url,
+          duplicationAllowed: false,
+        });
+        const filtered = {
+          ...insights,
+          issues: filterAIIssues(insights?.issues, {
+            mismatchPercentage: diffResult.mismatchPercentage,
+            diffPixels: diffResult.diffPixels,
+          }),
+        };
+        await supabase
+          .from('visual_runs')
+          .update({ ai_json: filtered, ai_status: 'completed', ai_error: null })
+          .eq('id', runId);
+      } catch (e: any) {
+        await supabase
+          .from('visual_runs')
+          .update({ ai_json: { error: e?.message ?? String(e) }, ai_status: 'failed', ai_error: e?.message ?? String(e) })
+          .eq('id', runId);
+        console.warn('[RUN_MONITOR] Async AI analysis failed for run:', runId, e?.message ?? e);
+      }
+    })();
+  }
+
   return {
     runId: runData.id,
     mismatchPercentage: diffResult.mismatchPercentage,
-    aiStatus,
+    severity,
   };
 }
 
