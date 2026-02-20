@@ -1,28 +1,64 @@
 // Supabase service role client (server-side only)
 // NEVER expose service role key to client
 
-import { createClient, SupabaseClient } from 'supabase';
+import { createClient } from '@supabase/supabase-js';
 
-let supabaseClient: SupabaseClient | null = null;
+let _client: ReturnType<typeof createClient> | null = null;
 
-export function getSupabaseServer(): SupabaseClient {
-  if (supabaseClient) {
-    return supabaseClient;
-  }
+export function getSupabaseServer() {
+  if (_client) return _client;
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const url = Deno.env.get('SUPABASE_URL')!;
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
-  }
-
-  supabaseClient = createClient(supabaseUrl, serviceRoleKey, {
+  _client = createClient(url, serviceKey, {
     auth: {
-      autoRefreshToken: false,
       persistSession: false,
+      autoRefreshToken: false,
     },
   });
 
-  return supabaseClient;
+  return _client;
+}
+
+// -------------------------------------------------------
+// Auth helpers
+// -------------------------------------------------------
+
+export class AuthError extends Error {
+  readonly status = 401;
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+/**
+ * Validate the user JWT from the Authorization header.
+ *
+ * Uses the service-role client with an explicit jwt argument to auth.getUser(token).
+ * This is required because auth.getUser() without an argument uses the client's
+ * internal session (null on a fresh client), causing GoTrue to receive Bearer null
+ * and return "Invalid JWT". Passing the token explicitly bypasses that.
+ *
+ * Returns the authenticated user's UUID, which is used as project_id.
+ * Throws AuthError (status 401) if the token is missing, malformed, or expired.
+ */
+export async function getUserFromRequest(req: Request) {
+  const authHeader = req.headers.get('Authorization');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new AuthError('Missing or invalid Authorization header');
+  }
+
+  const token = authHeader.slice(7);
+
+  const { data: { user }, error } =
+    await getSupabaseServer().auth.getUser(token);
+
+  if (error || !user) {
+    throw new AuthError(error?.message ?? 'Invalid or expired token');
+  }
+
+  return user.id;
 }

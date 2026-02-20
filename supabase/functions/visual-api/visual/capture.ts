@@ -149,3 +149,136 @@ async function captureScreenshotAttempt(
 
   return pngBytes;
 }
+
+// DOM snapshot element type
+export interface DomElement {
+  selector: string;
+  tag: string;
+  classes: string[];
+  id: string;
+  bbox: { x: number; y: number; width: number; height: number };
+  styles: Record<string, string>;
+  text: string;
+}
+
+export type DomSnapshot = DomElement[];
+
+/**
+ * Capture computed CSS styles for visible elements on a page.
+ * Uses Browserless /function endpoint to run JS in the browser context.
+ */
+export async function captureDomSnapshot(opts: {
+  url: string;
+  viewport?: Viewport;
+  captureSettings?: CaptureSettings;
+}): Promise<DomSnapshot> {
+  const { url, viewport = DEFAULT_VIEWPORT, captureSettings = {} } = opts;
+
+  const browserlessEndpoint = Deno.env.get('BROWSERLESS_REST_ENDPOINT');
+  const browserlessApiKey = Deno.env.get('BROWSERLESS_API_KEY');
+
+  if (!browserlessEndpoint) {
+    throw new Error('BROWSERLESS_REST_ENDPOINT not configured');
+  }
+
+  const functionUrl = `${browserlessEndpoint}/function${browserlessApiKey ? `?token=${browserlessApiKey}` : ''}`;
+
+  // The JS code to execute in the browser context
+  const browserCode = `
+    export default async function({ page }) {
+      await page.setViewport({ width: ${viewport.width}, height: ${viewport.height} });
+      await page.goto("${url.replace(/"/g, '\\"')}", {
+        waitUntil: "${captureSettings.waitUntil || 'networkidle2'}",
+        timeout: 30000,
+      });
+      await new Promise(resolve => setTimeout(resolve, ${captureSettings.waitForTimeout || 3000}));
+      ${captureSettings.waitForSelector ? `await page.waitForSelector("${captureSettings.waitForSelector.replace(/"/g, '\\"')}", { timeout: 10000 });` : ''}
+
+      const snapshot = await page.evaluate(() => {
+        const STYLE_PROPS = [
+          'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing',
+          'color', 'backgroundColor',
+          'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+          'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+          'borderRadius', 'borderColor', 'borderWidth',
+          'width', 'height', 'display', 'position',
+          'textAlign', 'textDecoration',
+        ];
+
+        const elements = [];
+        const allEls = document.querySelectorAll('body *');
+
+        for (const el of allEls) {
+          if (elements.length >= 500) break;
+
+          const rect = el.getBoundingClientRect();
+          // Skip invisible elements
+          if (rect.width === 0 || rect.height === 0) continue;
+          if (rect.bottom < 0 || rect.top > window.innerHeight) continue;
+
+          const computed = window.getComputedStyle(el);
+          if (computed.display === 'none' || computed.visibility === 'hidden' || computed.opacity === '0') continue;
+
+          const tag = el.tagName.toLowerCase();
+          // Skip non-visual elements
+          if (['script', 'style', 'noscript', 'meta', 'link', 'br', 'hr'].includes(tag)) continue;
+
+          const classes = Array.from(el.classList);
+          const id = el.id || '';
+
+          // Build selector
+          let selector = tag;
+          if (id) selector += '#' + id;
+          else if (classes.length > 0) selector += '.' + classes.slice(0, 3).join('.');
+
+          const styles = {};
+          for (const prop of STYLE_PROPS) {
+            const val = computed[prop];
+            if (val) styles[prop] = val;
+          }
+
+          const text = (el.textContent || '').trim().slice(0, 100);
+
+          elements.push({
+            selector,
+            tag,
+            classes,
+            id,
+            bbox: {
+              x: Math.round(rect.x),
+              y: Math.round(rect.y),
+              width: Math.round(rect.width),
+              height: Math.round(rect.height),
+            },
+            styles,
+            text: el.childNodes.length <= 3 ? text : '',
+          });
+        }
+
+        return elements;
+      });
+
+      return { data: snapshot, type: 'application/json' };
+    }
+  `;
+
+  try {
+    const response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/javascript' },
+      body: browserCode,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn('[DOM_SNAPSHOT] Capture failed:', response.status, errorText);
+      return [];
+    }
+
+    const result = await response.json();
+    return (result?.data || result || []) as DomSnapshot;
+  } catch (error: any) {
+    console.warn('[DOM_SNAPSHOT] Capture failed (non-fatal):', error.message);
+    return [];
+  }
+}

@@ -4,7 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { getApiBaseUrl, getApiHeaders } from '@/lib/apiBase';
+import { getApiBaseUrl } from '@/lib/apiBase';
+import { getAuthHeaders } from '@/lib/auth';
 
 type AIIssue = {
   title: string;
@@ -13,6 +14,20 @@ type AIIssue = {
   severity: 'minor' | 'major' | 'critical';
   evidence: string;
   recommendation: string;
+};
+
+type CssPropertyChange = {
+  property: string;
+  baseline: string;
+  current: string;
+  category: 'typography' | 'color' | 'spacing' | 'layout' | 'border' | 'other';
+};
+
+type CssDiffItem = {
+  selector: string;
+  tag: string;
+  text: string;
+  changes: CssPropertyChange[];
 };
 
 type AIInsights = {
@@ -35,6 +50,7 @@ type VisualRunResult = {
   diffUrl: string | null;
   baselineUrl?: string;
   aiJson?: AIInsights | null;
+  cssDiffJson?: CssDiffItem[] | null;
 };
 
 export default function VisualRun() {
@@ -48,18 +64,20 @@ export default function VisualRun() {
     setError(null);
     setData(null);
 
-    fetch(`${apiBase}/baselines/${baselineId}/runs/${runId}`, {
-      headers: getApiHeaders(),
-    })
-      .then(async (r) => {
-        if (!r.ok) {
-          const text = await r.text();
-          throw new Error(text || `HTTP ${r.status}`);
-        }
-        return r.json();
-      })
-      .then((json) => setData(json))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load run'));
+    const load = async () => {
+      const headers = await getAuthHeaders();
+      fetch(`${apiBase}/baselines/${baselineId}/runs/${runId}`, { headers })
+        .then(async (r) => {
+          if (!r.ok) {
+            const text = await r.text();
+            throw new Error(text || `HTTP ${r.status}`);
+          }
+          return r.json();
+        })
+        .then((json) => setData(json))
+        .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load run'));
+    };
+    load();
   }, [baselineId, runId]);
 
   return (
@@ -214,6 +232,57 @@ export default function VisualRun() {
                   <p className="text-sm text-muted-foreground mt-2">
                     This run is missing AI insights (this should never happen). Contact support.
                   </p>
+                </Card>
+              </>
+            )}
+
+            {data.cssDiffJson && data.cssDiffJson.length > 0 && (
+              <>
+                <Separator />
+                <Card className="p-6 space-y-4">
+                  <h2 className="text-xl font-semibold">
+                    CSS Changes
+                    <span className="ml-2 text-base font-normal text-muted-foreground">
+                      {data.cssDiffJson.length} element{data.cssDiffJson.length !== 1 ? 's' : ''} changed
+                    </span>
+                  </h2>
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                    {data.cssDiffJson.map((diff, idx) => {
+                      const categoryColors: Record<string, string> = {
+                        typography: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+                        color: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
+                        spacing: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300',
+                        layout: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
+                        border: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+                        other: 'bg-muted text-muted-foreground',
+                      };
+                      return (
+                        <Card key={idx} className="p-4 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <code className="text-sm font-mono font-medium break-all">{diff.selector}</code>
+                            {diff.text && (
+                              <span className="text-xs text-muted-foreground shrink-0 mt-0.5">
+                                "{diff.text.slice(0, 50)}{diff.text.length > 50 ? '…' : ''}"
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-1.5">
+                            {diff.changes.map((change, cidx) => (
+                              <div key={cidx} className="flex items-center gap-2 text-sm flex-wrap">
+                                <span className={`px-1.5 py-0.5 rounded text-[11px] font-medium shrink-0 ${categoryColors[change.category] || categoryColors.other}`}>
+                                  {change.category}
+                                </span>
+                                <span className="font-mono text-muted-foreground shrink-0">{change.property}:</span>
+                                <span className="line-through text-red-500 shrink-0">{change.baseline}</span>
+                                <span className="text-muted-foreground shrink-0">→</span>
+                                <span className="text-green-600 dark:text-green-400 font-medium shrink-0">{change.current}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
                 </Card>
               </>
             )}

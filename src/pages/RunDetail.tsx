@@ -4,7 +4,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { getApiBaseUrl, getApiHeaders } from '@/lib/apiBase';
+import { getApiBaseUrl } from '@/lib/apiBase';
+import { getAuthHeaders } from '@/lib/auth';
 
 type RunResponse = {
   runId: string;
@@ -27,16 +28,20 @@ export default function RunDetail() {
     setError(null);
     setData(null);
 
-    fetch(`${apiBase}/runs/${runId}`, { headers: getApiHeaders() })
-      .then(async (r) => {
+    const load = async () => {
+      try {
+        const r = await fetch(`${apiBase}/runs/${runId}`, { headers: await getAuthHeaders() });
         if (!r.ok) {
           const text = await r.text();
           throw new Error(text || `HTTP ${r.status}`);
         }
-        return r.json();
-      })
-      .then((json) => setData(json as RunResponse))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load run'));
+        const json = await r.json();
+        setData(json as RunResponse);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to load run');
+      }
+    };
+    load();
   }, [runId]);
 
   const severityBadge = (severity: string) => {

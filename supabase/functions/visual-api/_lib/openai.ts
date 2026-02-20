@@ -11,6 +11,11 @@ export async function generateAIInsights(opts: {
   diffPixels: number;
   baselineSourceUrl?: string | null;
   currentSourceUrl?: string | null;
+  cssDiffSummary?: string | null;
+  cssDiffDetails?: Array<{
+    selector: string;
+    changes: Array<{ property: string; baseline: string; current: string; category: string }>;
+  }> | null;
 }): Promise<AIInsights> {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
   const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini";

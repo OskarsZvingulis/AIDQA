@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,10 +6,41 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getApiBaseUrl, validateApiConfig, getApiHeaders } from '@/lib/apiBase';
+import { getApiBaseUrl, validateApiConfig } from '@/lib/apiBase';
+import { getAuthHeaders } from '@/lib/auth';
 import { supabase, VISUAL_BUCKET } from '@/lib/supabaseClient';
 
 type DevicePreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
+
+type AIIssue = {
+  title: string;
+  location: string;
+  type: string;
+  severity: string;
+  evidence: string;
+  recommendation: string;
+};
+
+type AIInsights = {
+  summary: string;
+  severity: string;
+  issues: AIIssue[];
+  quickWins: string[];
+};
+
+type CssChange = {
+  property: string;
+  baseline: string;
+  current: string;
+  category: string;
+};
+
+type CssDiffItem = {
+  selector: string;
+  tag: string;
+  text: string;
+  changes: CssChange[];
+};
 
 export default function Index() {
   // Step 1: Create Baseline
@@ -38,7 +69,10 @@ export default function Index() {
   const [baselineImageUrl, setBaselineImageUrl] = useState<string | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [diffImageUrl, setDiffImageUrl] = useState<string | null>(null);
-  
+  const [aiData, setAiData] = useState<AIInsights | null>(null);
+  const [aiStatus, setAiStatus] = useState<string | null>(null);
+  const [cssDiffData, setCssDiffData] = useState<CssDiffItem[] | null>(null);
+
   // UI state
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -46,10 +80,18 @@ export default function Index() {
   const [monitorLoading, setMonitorLoading] = useState(false);
   
   const apiBase = getApiBaseUrl();
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const monitorCreatingRef = useRef(false);
 
   useEffect(() => {
     localStorage.setItem('aidqa_target_url', targetUrl);
   }, [targetUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current !== null) clearInterval(pollIntervalRef.current);
+    };
+  }, []);
 
   const handleDeviceChange = (value: DevicePreset) => {
     setDevicePreset(value);
@@ -91,67 +133,109 @@ export default function Index() {
     return data?.signedUrl || null;
   };
 
-  const loadLatestRunComparison = async (createdMonitorId: string) => {
-    setComparisonStatusMessage('Generating comparison...');
+  const stopPolling = () => {
+    if (pollIntervalRef.current !== null) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  };
+
+  const loadLatestRunComparison = (createdMonitorId: string) => {
+    stopPolling();
+    setComparisonStatusMessage('Processing run...');
     setComparisonError(null);
     setComparisonLoading(true);
     setBaselineImageUrl(null);
     setCurrentImageUrl(null);
     setDiffImageUrl(null);
+    setAiData(null);
+    setAiStatus(null);
+    setCssDiffData(null);
 
-    try {
-      const { data: latestRun, error: runError } = await supabase
-        .from('visual_runs')
-        .select('*')
-        .eq('monitor_id', createdMonitorId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+    const startTime = Date.now();
 
-      if (runError) {
-        if (runError.code === 'PGRST116') {
-          setComparisonStatusMessage('Run failed to generate result');
+    const tick = async () => {
+      try {
+        const { data: latestRun, error: runError } = await supabase
+          .from('visual_runs')
+          .select('*')
+          .eq('monitor_id', createdMonitorId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (runError) {
+          stopPolling();
+          setComparisonError(runError.message || 'Failed to load run');
+          setComparisonStatusMessage(null);
+          setComparisonLoading(false);
           return;
         }
-        throw new Error(runError.message || 'Failed to load latest run');
+
+        const timedOut = Date.now() - startTime > 30_000;
+
+        const aiSettled =
+          latestRun?.ai_status === 'completed' || latestRun?.ai_status === 'failed';
+
+        if (
+          !latestRun ||
+          latestRun.status !== 'completed' ||
+          latestRun.mismatch_percentage === null ||
+          !aiSettled
+        ) {
+          if (timedOut) {
+            stopPolling();
+            setComparisonStatusMessage('Run timed out');
+            setComparisonLoading(false);
+          }
+          return; // keep polling
+        }
+
+        // Row exists, status=completed, mismatch_percentage set — load images
+        stopPolling();
+
+        setAiStatus(latestRun.ai_status ?? null);
+        if (latestRun.ai_status === 'completed' && latestRun.ai_json) {
+          setAiData(latestRun.ai_json as AIInsights);
+        }
+        if (latestRun.css_diff_json) {
+          setCssDiffData(latestRun.css_diff_json as CssDiffItem[]);
+        }
+
+        const mismatch = Number(latestRun.mismatch_percentage ?? 0);
+        if (Number.isFinite(mismatch)) setMonitorMismatchPercentage(mismatch);
+
+        const { data: baselineRows, error: baselineError } = await supabase
+          .from('design_baselines')
+          .select('snapshot_path')
+          .eq('id', latestRun.baseline_id)
+          .limit(1);
+
+        if (baselineError) throw new Error(baselineError.message || 'Failed to load baseline path');
+
+        const snapshotPath = baselineRows?.[0]?.snapshot_path || null;
+
+        const [signedBaseline, signedCurrent, signedDiff] = await Promise.all([
+          createSignedUrl(snapshotPath),
+          createSignedUrl(latestRun.current_path || null),
+          createSignedUrl(latestRun.diff_path || null),
+        ]);
+
+        setBaselineImageUrl(signedBaseline ?? (baselinePreviewUrl || null));
+        setCurrentImageUrl(signedCurrent);
+        setDiffImageUrl(signedDiff);
+        setComparisonStatusMessage(null);
+        setComparisonLoading(false);
+      } catch (e) {
+        stopPolling();
+        setComparisonError(e instanceof Error ? e.message : 'Failed to load comparison images');
+        setComparisonStatusMessage(null);
+        setComparisonLoading(false);
       }
+    };
 
-      if (!latestRun) {
-        setComparisonStatusMessage('Run failed to generate result');
-        return;
-      }
-
-      const mismatch = Number(latestRun.mismatch_percentage ?? 0);
-      if (Number.isFinite(mismatch)) {
-        setMonitorMismatchPercentage(mismatch);
-      }
-
-      const { data: baselineRows, error: baselineError } = await supabase
-        .from('design_baselines')
-        .select('snapshot_path')
-        .eq('id', latestRun.baseline_id)
-        .limit(1);
-
-      if (baselineError) throw new Error(baselineError.message || 'Failed to load baseline path');
-
-      const snapshotPath = baselineRows?.[0]?.snapshot_path || null;
-
-      const [signedBaseline, signedCurrent, signedDiff] = await Promise.all([
-        createSignedUrl(snapshotPath),
-        createSignedUrl(latestRun.current_path || null),
-        createSignedUrl(latestRun.diff_path || null),
-      ]);
-
-      setBaselineImageUrl(signedBaseline ?? (baselinePreviewUrl || null));
-      setCurrentImageUrl(signedCurrent);
-      setDiffImageUrl(signedDiff);
-      setComparisonStatusMessage(null);
-    } catch (e) {
-      setComparisonStatusMessage(null);
-      setComparisonError(e instanceof Error ? e.message : 'Failed to load comparison images');
-    } finally {
-      setComparisonLoading(false);
-    }
+    tick(); // run immediately
+    pollIntervalRef.current = setInterval(tick, 1500);
   };
 
   const handleCaptureBaseline = async () => {
@@ -174,7 +258,6 @@ export default function Index() {
       const viewport = parseViewport();
 
       const body = {
-        projectId: 'demo',
         name: baselineName.trim(),
         sourceType: 'url',
         sourceUrl: sourceUrl.trim(),
@@ -183,7 +266,7 @@ export default function Index() {
 
       const res = await fetch(`${apiBase}/baselines`, {
         method: 'POST',
-        headers: getApiHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify(body),
       });
 
@@ -212,7 +295,7 @@ export default function Index() {
     try {
       const res = await fetch(`${apiBase}/baselines/${baselineId}/approve`, {
         method: 'POST',
-        headers: getApiHeaders(),
+        headers: await getAuthHeaders(),
       });
 
       if (!res.ok) {
@@ -229,6 +312,8 @@ export default function Index() {
   };
 
   const handleStartMonitoring = async () => {
+    if (monitorCreatingRef.current) return;
+    monitorCreatingRef.current = true;
     setError(null);
     setComparisonStatusMessage(null);
     setComparisonError(null);
@@ -239,7 +324,6 @@ export default function Index() {
       }
 
       const body = {
-        projectId: 'demo',
         baselineId,
         targetUrl: targetUrl.trim(),
         cadence,
@@ -247,7 +331,7 @@ export default function Index() {
 
       const res = await fetch(`${apiBase}/monitors`, {
         method: 'POST',
-        headers: getApiHeaders(),
+        headers: await getAuthHeaders(),
         body: JSON.stringify(body),
       });
 
@@ -267,9 +351,10 @@ export default function Index() {
 
       setMonitorId(id);
       setMonitorMismatchPercentage(mismatchPercentage);
-      await loadLatestRunComparison(id);
+      loadLatestRunComparison(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create monitor');
+      monitorCreatingRef.current = false;
     } finally {
       setMonitorLoading(false);
     }
@@ -541,6 +626,135 @@ export default function Index() {
                   {(monitorMismatchPercentage === 0 || !diffImageUrl) && (
                     <p className="text-sm text-muted-foreground">No visual differences detected</p>
                   )}
+                </Card>
+              )}
+
+              {/* AI Analysis */}
+              {(aiData || aiStatus === 'failed') && (
+                <Card className="p-4 border space-y-5">
+                  <p className="text-sm font-bold tracking-tight">AI Analysis</p>
+
+                  {aiStatus === 'failed' && !aiData && (
+                    <p className="text-xs text-muted-foreground">
+                      AI analysis failed for this run.
+                    </p>
+                  )}
+
+                  {aiData && (
+                    <>
+                      {/* Summary */}
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold">Summary</p>
+                        <p className="text-sm text-muted-foreground">{aiData.summary}</p>
+                      </div>
+
+                      {/* Severity */}
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold">Severity</p>
+                        <Badge
+                          variant={
+                            aiData.severity === 'critical' || aiData.severity === 'major'
+                              ? 'destructive'
+                              : aiData.severity === 'pass'
+                              ? 'default'
+                              : 'secondary'
+                          }
+                        >
+                          {aiData.severity}
+                        </Badge>
+                      </div>
+
+                      {/* Quick Wins */}
+                      {aiData.quickWins && aiData.quickWins.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold">Quick Wins</p>
+                          <ul className="list-disc list-inside space-y-1">
+                            {aiData.quickWins.map((win, i) => (
+                              <li key={i} className="text-sm text-muted-foreground">{win}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Issues */}
+                      {aiData.issues.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-semibold">
+                            Issues ({aiData.issues.length})
+                          </p>
+                          <ul className="space-y-3">
+                            {aiData.issues.map((issue, i) => (
+                              <li key={i} className="border rounded p-3 space-y-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-medium">{issue.title}</p>
+                                  <Badge
+                                    variant={
+                                      issue.severity === 'critical'
+                                        ? 'destructive'
+                                        : issue.severity === 'major'
+                                        ? 'destructive'
+                                        : 'secondary'
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {issue.severity}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  <span className="font-medium text-foreground">Location: </span>
+                                  {issue.location}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  <span className="font-medium text-foreground">Evidence: </span>
+                                  {issue.evidence}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  <span className="font-medium text-foreground">Recommendation: </span>
+                                  {issue.recommendation}
+                                </p>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </Card>
+              )}
+
+              {/* CSS Diff */}
+              {cssDiffData && cssDiffData.length > 0 && (
+                <Card className="p-4 border space-y-4">
+                  <p className="text-sm font-semibold">
+                    CSS Changes ({cssDiffData.length} element{cssDiffData.length !== 1 ? 's' : ''})
+                  </p>
+                  <ul className="space-y-3">
+                    {cssDiffData.map((item, i) => (
+                      <li key={i} className="border rounded p-3 space-y-2">
+                        <div>
+                          <p className="text-xs font-mono text-muted-foreground break-all">{item.selector}</p>
+                          {item.text && (
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">"{item.text}"</p>
+                          )}
+                        </div>
+                        <ul className="space-y-1">
+                          {item.changes.map((change, j) => (
+                            <li key={j} className="grid grid-cols-[auto_1fr_1fr] gap-x-3 text-xs items-start">
+                              <span className="font-mono text-muted-foreground whitespace-nowrap">
+                                {change.property}
+                              </span>
+                              <span className="font-mono truncate text-red-500" title={change.baseline}>
+                                {change.baseline}
+                              </span>
+                              <span className="font-mono truncate text-green-600" title={change.current}>
+                                {change.current}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
                 </Card>
               )}
             </div>

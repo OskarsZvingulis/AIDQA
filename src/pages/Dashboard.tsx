@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { getApiBaseUrl, getApiHeaders, getSupabaseAnonKey, getSupabaseProjectUrl } from '@/lib/apiBase';
+import { getApiBaseUrl } from '@/lib/apiBase';
+import { supabase, VISUAL_BUCKET } from '@/lib/supabaseClient';
+import { getAuthHeaders } from '@/lib/auth';
 import {
   Table,
   TableBody,
@@ -69,47 +71,16 @@ export default function Dashboard() {
     currentUrl: null,
     diffUrl: null,
   });
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [deletingMonitorId, setDeletingMonitorId] = useState<string | null>(null);
   const navigate = useNavigate();
   const apiBase = getApiBaseUrl();
-  const supabaseUrl = getSupabaseProjectUrl();
-  const anonKey = getSupabaseAnonKey();
 
-  const buildRestUrl = (path: string, query: string) => {
-    return `${supabaseUrl}/rest/v1/${path}?${query}`;
-  };
-
-  const parseSignedUrl = (signedPath: string) => {
-    if (!signedPath) return null;
-    if (signedPath.startsWith('http://') || signedPath.startsWith('https://')) return signedPath;
-    if (signedPath.startsWith('/object/')) return `${supabaseUrl}/storage/v1${signedPath}`;
-    if (signedPath.startsWith('/storage/')) return `${supabaseUrl}${signedPath}`;
-    return `${supabaseUrl}/storage/v1/${signedPath.replace(/^\/+/, '')}`;
-  };
-
-  const createSignedUrl = async (path: string | null) => {
-    if (!path || !supabaseUrl || !anonKey) return null;
-    const encodedPath = path
-      .split('/')
-      .map((segment) => encodeURIComponent(segment))
-      .join('/');
-
-    const response = await fetch(`${supabaseUrl}/storage/v1/object/sign/visual/${encodedPath}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${anonKey}`,
-        apikey: anonKey,
-      },
-      body: JSON.stringify({ expiresIn: 3600 }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || `Failed to sign storage URL (${response.status})`);
-    }
-
-    const json = await response.json();
-    return parseSignedUrl(json.signedURL || json.signedUrl || '');
+  const createSignedUrl = async (path: string | null): Promise<string | null> => {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from(VISUAL_BUCKET).createSignedUrl(path, 3600);
+    if (error) throw new Error(error.message || 'Failed to sign URL');
+    return data?.signedUrl ?? null;
   };
 
   const getLatestRunByMonitor = (runs: VisualRunRow[]) => {
@@ -124,13 +95,18 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email ?? null);
+    });
+  }, []);
+
+  useEffect(() => {
     setError(null);
     setLoading(true);
     const load = async () => {
       try {
-        const monitorsResponse = await fetch(`${apiBase}/monitors?projectId=demo`, {
-          headers: getApiHeaders(),
-        });
+        const headers = await getAuthHeaders();
+        const monitorsResponse = await fetch(`${apiBase}/monitors`, { headers });
 
         if (!monitorsResponse.ok) {
           const text = await monitorsResponse.text();
@@ -140,36 +116,15 @@ export default function Dashboard() {
         const monitorsJson = (await monitorsResponse.json()) as MonitorItem[];
         const monitors = monitorsJson || [];
 
-        if (!supabaseUrl || !anonKey) {
-          const fallbackRows = monitors.map((monitor) => ({
-            monitor,
-            latestRun: null,
-            baselinePath: null,
-          }));
-          setRows(fallbackRows);
-          return;
-        }
+        // RLS on visual_runs filters to the authenticated user automatically
+        const { data: runs, error: runsError } = await supabase
+          .from('visual_runs')
+          .select('id,monitor_id,baseline_id,status,mismatch_percentage,created_at,current_path,diff_path')
+          .order('created_at', { ascending: false })
+          .limit(200);
 
-        const runsQuery = new URLSearchParams({
-          select: 'id,monitor_id,baseline_id,status,mismatch_percentage,created_at,current_path,diff_path',
-          project_id: 'eq.demo',
-          order: 'created_at.desc',
-          limit: '200',
-        }).toString();
+        if (runsError) throw new Error(runsError.message || 'Failed to load runs');
 
-        const runsResponse = await fetch(buildRestUrl('visual_runs', runsQuery), {
-          headers: {
-            Authorization: `Bearer ${anonKey}`,
-            apikey: anonKey,
-          },
-        });
-
-        if (!runsResponse.ok) {
-          const text = await runsResponse.text();
-          throw new Error(text || `HTTP ${runsResponse.status}`);
-        }
-
-        const runs = (await runsResponse.json()) as VisualRunRow[];
         const latestByMonitor = getLatestRunByMonitor(runs || []);
 
         const baselineIds = Array.from(
@@ -178,24 +133,13 @@ export default function Dashboard() {
 
         const baselinePathById = new Map<string, string>();
         if (baselineIds.length > 0) {
-          const baselineQuery = new URLSearchParams({
-            select: 'id,snapshot_path',
-            id: `in.(${baselineIds.join(',')})`,
-          }).toString();
+          const { data: baselines, error: baselinesError } = await supabase
+            .from('design_baselines')
+            .select('id,snapshot_path')
+            .in('id', baselineIds);
 
-          const baselinesResponse = await fetch(buildRestUrl('design_baselines', baselineQuery), {
-            headers: {
-              Authorization: `Bearer ${anonKey}`,
-              apikey: anonKey,
-            },
-          });
+          if (baselinesError) throw new Error(baselinesError.message || 'Failed to load baselines');
 
-          if (!baselinesResponse.ok) {
-            const text = await baselinesResponse.text();
-            throw new Error(text || `HTTP ${baselinesResponse.status}`);
-          }
-
-          const baselines = (await baselinesResponse.json()) as BaselinePathRow[];
           for (const baseline of baselines || []) {
             baselinePathById.set(baseline.id, baseline.snapshot_path);
           }
@@ -216,13 +160,31 @@ export default function Dashboard() {
     };
 
     load();
-  }, [apiBase, anonKey, supabaseUrl]);
+  }, [apiBase]);
 
   const getStatusBadge = (status: string | null) => {
     if (!status) return <Badge variant="secondary">No runs yet</Badge>;
     if (status === 'completed') return <Badge variant="default">Completed</Badge>;
     if (status === 'failed') return <Badge variant="destructive">Failed</Badge>;
     return <Badge variant="secondary">{status}</Badge>;
+  };
+
+  const handleDeleteMonitor = async (monitorId: string) => {
+    if (!window.confirm('Delete this monitor and all its runs? This cannot be undone.')) return;
+    setDeletingMonitorId(monitorId);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`${apiBase}/monitors/${monitorId}`, { method: 'DELETE', headers });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      setRows((prev) => prev.filter((r) => r.monitor.monitorId !== monitorId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete monitor');
+    } finally {
+      setDeletingMonitorId(null);
+    }
   };
 
   const openResultDialog = async (row: DashboardMonitorRow) => {
@@ -255,9 +217,17 @@ export default function Dashboard() {
             <h1 className="text-4xl font-bold tracking-tight">AIDQA Dashboard</h1>
             <p className="text-muted-foreground mt-1">Monitor your visual regression tests</p>
           </div>
-          <Button onClick={() => navigate('/create-monitor')} size="lg">
-            + Add Monitor
-          </Button>
+          <div className="flex items-center gap-3">
+            {userEmail && (
+              <span className="text-sm text-muted-foreground">{userEmail}</span>
+            )}
+            <Button onClick={() => navigate('/create-monitor')} size="lg">
+              + Add Monitor
+            </Button>
+            <Button variant="outline" onClick={async () => { await supabase.auth.signOut(); navigate('/login'); }}>
+              Sign out
+            </Button>
+          </div>
         </header>
 
         {error && (
@@ -316,18 +286,28 @@ export default function Dashboard() {
                         : 'Never'}
                     </TableCell>
                     <TableCell>
-                      {hasRun ? (
+                      <div className="flex items-center gap-2">
+                        {hasRun ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openResultDialog(row)}
+                            disabled={!canView || imageLoading}
+                          >
+                            View Result
+                          </Button>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">No runs yet</span>
+                        )}
                         <Button
-                          variant="outline"
+                          variant="destructive"
                           size="sm"
-                          onClick={() => openResultDialog(row)}
-                          disabled={!canView || imageLoading}
+                          onClick={() => handleDeleteMonitor(row.monitor.monitorId)}
+                          disabled={deletingMonitorId === row.monitor.monitorId}
                         >
-                          View Result
+                          {deletingMonitorId === row.monitor.monitorId ? 'Deleting…' : 'Delete'}
                         </Button>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No runs yet</span>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )})}
@@ -383,6 +363,11 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            <div className="flex justify-end pt-2">
+              <Button variant="outline" onClick={() => { setDialogOpen(false); setSelectedRow(null); }}>
+                Back
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

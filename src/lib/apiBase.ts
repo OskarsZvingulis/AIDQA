@@ -33,14 +33,14 @@ export function getSupabaseAnonKey(): string {
 }
 
 /**
- * Get headers for API requests with authentication
+ * Get headers for API requests with the authenticated user's session token.
  */
-export function getApiHeaders(): Record<string, string> {
-  const anonKey = getSupabaseAnonKey();
+export async function getApiHeaders(): Promise<Record<string, string>> {
+  const { supabase } = await import('./supabaseClient');
+  const { data: { session } } = await supabase.auth.getSession();
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (anonKey) {
-    headers['Authorization'] = `Bearer ${anonKey}`;
-    headers['apikey'] = anonKey;
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
   }
   return headers;
 }
