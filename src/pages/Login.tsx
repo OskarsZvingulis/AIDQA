@@ -19,7 +19,10 @@ export default function Login() {
     setError(null);
     setGoogleLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.origin },
+      });
       if (error) throw error;
     } catch (e: any) {
       setError(e.message || 'Google sign-in failed');
