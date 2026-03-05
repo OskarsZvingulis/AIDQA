@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand-navy:        222 47% 11%;
+  --brand-navy-mid:    221 39% 22%;
+  --brand-navy-light:  220 35% 32%;
+  --brand-indigo:      243 75% 59%;
+  --brand-indigo-dark: 243 68% 48%;
+  --brand-slate-100:   215 28% 97%;
+  --brand-slate-400:   215 16% 47%;
+  --brand-slate-900:   222 47% 8%;
+  --brand-success:     142 70% 45%;
+  --brand-warning:     38 92% 50%;
+  --brand-danger:      0 84% 60%;
+}
