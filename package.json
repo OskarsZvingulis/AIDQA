@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "start": "npx serve -s dist -l $PORT",
     "lint": "eslint .",
     "test": "vitest run",
     "supabase:functions": "npx supabase functions serve visual-api --no-verify-jwt",
