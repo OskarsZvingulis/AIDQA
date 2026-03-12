@@ -13,15 +13,15 @@ export function Footer() {
           </div>
 
           <div className="flex flex-wrap gap-6 justify-center">
-            <a href="#product" className="text-sm hover:opacity-70 transition-opacity">Product</a>
-            <a href="#how-it-works" className="text-sm hover:opacity-70 transition-opacity">How it works</a>
-            <a href="#demo" className="text-sm hover:opacity-70 transition-opacity">Demo</a>
-            <a href="#early-access" className="text-sm hover:opacity-70 transition-opacity">Early Access</a>
-            <a href="#privacy" className="text-sm hover:opacity-70 transition-opacity">Privacy</a>
+            <a href="#product" className="text-sm hover:opacity-70 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)] focus-visible:ring-offset-2">Product</a>
+            <a href="#how-it-works" className="text-sm hover:opacity-70 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)] focus-visible:ring-offset-2">How it works</a>
+            <a href="#demo" className="text-sm hover:opacity-70 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)] focus-visible:ring-offset-2">Demo</a>
+            <a href="#early-access" className="text-sm hover:opacity-70 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)] focus-visible:ring-offset-2">Early Access</a>
+            <a href="/privacy" className="text-sm hover:opacity-70 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)] focus-visible:ring-offset-2">Privacy</a>
           </div>
 
           <div className="text-sm" style={{ color: "var(--text-muted)" }}>
-            <a href="mailto:hello@aidqa.com" className="hover:opacity-70 transition-opacity">
+            <a href="mailto:hello@aidqa.com" className="hover:opacity-70 transition-opacity rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)] focus-visible:ring-offset-2">
               hello@aidqa.com
             </a>
           </div>

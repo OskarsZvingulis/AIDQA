@@ -18,16 +18,16 @@
 }
 
 /* ── Marketing homepage tokens (from marketing app) ── */
-@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&display=swap');
-
 :root {
   --font-size: 16px;
+  --text-base: 1rem;
   --background: #F6F7F9;
   --foreground: #0B1020;
-  --text-muted: #6B7280;
+  --text-muted: #4B5563;
   --border-subtle: #E5E7EB;
   --accent-orange: #F97316;
   --card: #ffffff;
+  --card-muted: #1a1a2e;
   --card-foreground: #0B1020;
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
@@ -71,6 +71,7 @@
   --border-subtle: #2D3548;
   --accent-orange: #F97316;
   --card: #252938;
+  --card-muted: #0f1117;
   --card-foreground: #F6F7F9;
   --popover: oklch(0.145 0 0);
   --popover-foreground: oklch(0.985 0 0);

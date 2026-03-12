@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+const inputClass = "w-full px-4 py-3 min-h-[44px] rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-orange)] focus:ring-offset-2 focus:border-[var(--accent-orange)]";
+const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)] focus-visible:ring-offset-2";
+
 export function EarlyAccessForm() {
   const [formData, setFormData] = useState({
     email: "",
@@ -9,12 +12,26 @@ export function EarlyAccessForm() {
     companySize: "",
     expectations: "",
   });
+  const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    alert("Thank you! We'll email you when your spot opens.");
+    setSubmitted(true);
   };
+
+  if (submitted) {
+    return (
+      <section id="early-access" className="py-20 md:py-32">
+        <div className="max-w-[600px] mx-auto px-6 md:px-8 text-center">
+          <div className="text-5xl mb-6" aria-hidden="true">🎉</div>
+          <h2 className="mb-4">You're on the list!</h2>
+          <p className="text-lg" style={{ color: "var(--text-muted)" }}>
+            We'll email you at <strong>{formData.email}</strong> when your invite is ready.
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section id="early-access" className="py-20 md:py-32">
@@ -32,13 +49,13 @@ export function EarlyAccessForm() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="email" className="block mb-2 text-sm">
-              Email <span style={{ color: "var(--accent-orange)" }}>*</span>
+              Email <span style={{ color: "var(--accent-orange)" }} aria-label="required">*</span>
             </label>
             <input
               type="email"
               id="email"
               required
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] focus:border-[var(--accent-orange)] focus:outline-none transition-colors"
+              className={inputClass}
               placeholder="you@company.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -51,7 +68,7 @@ export function EarlyAccessForm() {
             </label>
             <select
               id="role"
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] focus:border-[var(--accent-orange)] focus:outline-none transition-colors"
+              className={inputClass}
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value })}
             >
@@ -70,7 +87,7 @@ export function EarlyAccessForm() {
             </label>
             <select
               id="companySize"
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] focus:border-[var(--accent-orange)] focus:outline-none transition-colors"
+              className={inputClass}
               value={formData.companySize}
               onChange={(e) => setFormData({ ...formData, companySize: e.target.value })}
             >
@@ -84,12 +101,13 @@ export function EarlyAccessForm() {
 
           <div>
             <label htmlFor="expectations" className="block mb-2 text-sm">
-              What UI problems are slowing you down? <span className="text-xs" style={{ color: "var(--text-muted)" }}>(optional)</span>
+              What UI problems are slowing you down?{" "}
+              <span className="text-xs" style={{ color: "var(--text-muted)" }}>(optional)</span>
             </label>
             <textarea
               id="expectations"
               rows={4}
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] focus:border-[var(--accent-orange)] focus:outline-none transition-colors resize-none"
+              className={`${inputClass} resize-y`}
               placeholder="e.g., 'Spacing is inconsistent', 'Mobile layouts break', 'Accessibility issues I miss'..."
               value={formData.expectations}
               onChange={(e) => setFormData({ ...formData, expectations: e.target.value })}
@@ -98,7 +116,7 @@ export function EarlyAccessForm() {
 
           <button
             type="submit"
-            className="w-full px-8 py-4 rounded-full bg-[var(--accent-orange)] text-white hover:opacity-90 transition-opacity shadow-lg"
+            className={`w-full px-8 py-4 min-h-[44px] rounded-full bg-[var(--accent-orange)] text-white hover:opacity-90 transition-opacity shadow-lg ${focusRing}`}
           >
             Request invite
           </button>

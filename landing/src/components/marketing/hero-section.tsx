@@ -3,8 +3,10 @@
 import { Play } from "lucide-react";
 import { useState } from "react";
 
+const focusRing = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-orange)] focus-visible:ring-offset-2";
+
 export function HeroSection() {
-  const [isVideoHovered, setIsVideoHovered] = useState(false);
+  const [isVideoActive, setIsVideoActive] = useState(false);
 
   return (
     <section className="py-20 md:py-32">
@@ -24,12 +26,14 @@ export function HeroSection() {
 
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
               <button
-                className="px-8 py-4 rounded-full bg-[var(--accent-orange)] text-white hover:opacity-90 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+                className={`px-8 py-4 min-h-[44px] rounded-full bg-[var(--accent-orange)] text-white hover:opacity-90 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 ${focusRing}`}
+                onClick={() => document.getElementById("early-access")?.scrollIntoView({ behavior: "smooth" })}
               >
                 Join the waitlist
               </button>
               <button
-                className="px-8 py-4 rounded-full border-2 border-[var(--foreground)] text-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition-all"
+                className={`px-8 py-4 min-h-[44px] rounded-full border-2 border-[var(--foreground)] text-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition-all ${focusRing}`}
+                onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
               >
                 View demo report
               </button>
@@ -41,29 +45,34 @@ export function HeroSection() {
           </div>
 
           {/* Right: Product Preview */}
-          <div
-            className="relative group cursor-pointer rounded-2xl overflow-hidden shadow-2xl"
-            onMouseEnter={() => setIsVideoHovered(true)}
-            onMouseLeave={() => setIsVideoHovered(false)}
+          <button
+            className={`relative group rounded-2xl overflow-hidden shadow-2xl w-full text-left ${focusRing}`}
+            aria-label="Preview demo video"
+            onMouseEnter={() => setIsVideoActive(true)}
+            onMouseLeave={() => setIsVideoActive(false)}
+            onFocus={() => setIsVideoActive(true)}
+            onBlur={() => setIsVideoActive(false)}
+            onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
           >
             <div className="aspect-video bg-[var(--card)] flex items-center justify-center">
-              <div className="w-full h-full bg-[var(--card-muted,#1a1a2e)] flex items-center justify-center">
-                <span className="text-4xl opacity-20">▶</span>
+              <div className="w-full h-full bg-[var(--card-muted)] flex items-center justify-center">
+                <span className="text-4xl opacity-20" aria-hidden="true">▶</span>
               </div>
             </div>
 
-            {/* Overlay on hover */}
+            {/* Overlay on hover/focus */}
             <div
               className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity duration-300 ${
-                isVideoHovered ? "opacity-100" : "opacity-0"
+                isVideoActive ? "opacity-100" : "opacity-0"
               }`}
+              aria-hidden="true"
             >
               <div className="flex items-center gap-3 text-white">
                 <Play className="w-8 h-8" fill="white" />
                 <span className="text-xl">View demo</span>
               </div>
             </div>
-          </div>
+          </button>
         </div>
       </div>
     </section>
