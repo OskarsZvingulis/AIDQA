@@ -1,27 +1,23 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react-swc'
+import path from 'path'
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
   server: {
-    host: "::",
+    host: '::',
     port: 8080,
     proxy: {
-      '/api': {
-        target: 'http://localhost:8787',
+      '/v1': {
+        target: 'http://localhost:54321/functions/v1/aidqa-api',
         changeOrigin: true,
-      },
-      '/storage': {
-        target: 'http://localhost:8787',
-        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/v1/, '/v1'),
       },
     },
   },
-  plugins: [react()].filter(Boolean),
+  plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      '@': path.resolve(__dirname, './src'),
     },
   },
-}));
+})

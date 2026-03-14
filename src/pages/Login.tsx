@@ -50,7 +50,7 @@ export default function Login() {
       <Card className="w-full max-w-sm p-8 space-y-6">
         <div className="space-y-1 text-center">
           <h1 className="text-2xl font-bold">Sign in to AIDQA</h1>
-          <p className="text-sm text-muted-foreground">Visual regression monitoring</p>
+          <p className="text-sm text-muted-foreground">AI design QA for your UI</p>
         </div>
 
         {error && (

@@ -1,12 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
-import { getSupabaseAnonKey, getSupabaseProjectUrl } from '@/lib/apiBase';
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = getSupabaseProjectUrl();
-const supabaseAnonKey = getSupabaseAnonKey();
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-export const VISUAL_BUCKET = 'visual';
-
-console.log(import.meta.env)
-console.log(import.meta.env.VITE_SUPABASE_URL)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
