@@ -37,3 +37,6 @@ storage/
 
 # Planning docs
 AIDQA_v2_CLAUDE.md
+
+# Build artifacts
+*.tsbuildinfo
