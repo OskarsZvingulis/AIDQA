@@ -62,12 +62,6 @@ const SEVERITY_DOT: Record<string, string> = {
   low: 'bg-blue-500',
 }
 
-const OVERLAY_COLORS: Record<string, string> = {
-  critical: '#dc2626',
-  high: '#ea580c',
-  medium: '#ca8a04',
-  low: '#2563eb',
-}
 
 export default function ScanResult() {
   const { scanId } = useParams<{ scanId: string }>()
@@ -78,8 +72,6 @@ export default function ScanResult() {
   const [selectedFinding, setSelectedFinding] = useState<string | null>(null)
   const [expandedFix, setExpandedFix] = useState<string | null>(null)
   const [showOverlay, setShowOverlay] = useState(true)
-  const [imageSize, setImageSize] = useState({ w: 0, h: 0 })
-  const imgRef = useRef<HTMLImageElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -129,24 +121,6 @@ export default function ScanResult() {
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
     }
   }, [scanId])
-
-  const updateImageSize = () => {
-    if (imgRef.current) {
-      setImageSize({ w: imgRef.current.clientWidth, h: imgRef.current.clientHeight })
-    }
-  }
-
-  const scaleBox = (box: { x: number; y: number; width: number; height: number }) => {
-    if (!imageSize.w || !imageSize.h) return null
-    const scaleX = imageSize.w / 1440
-    const scaleY = imageSize.h / (imgRef.current?.naturalHeight ?? 1440)
-    return {
-      left: box.x * scaleX,
-      top: box.y * scaleY,
-      width: box.width * scaleX,
-      height: box.height * scaleY,
-    }
-  }
 
   const isLoading = !scan || scan.status === 'pending' || scan.status === 'processing'
   const imageUrl = showOverlay ? artifacts.overlay_path : artifacts.normalized_path
@@ -219,47 +193,10 @@ export default function ScanResult() {
                 {imageUrl ? (
                   <>
                     <img
-                      ref={imgRef}
                       src={imageUrl}
                       alt="UI screenshot"
                       className="w-full h-auto block"
-                      onLoad={updateImageSize}
                     />
-                    {/* Overlay boxes on original view */}
-                    {!showOverlay && imageSize.w > 0 && findings.map(f => {
-                      const isSelected = selectedFinding === f.id
-                      const color = OVERLAY_COLORS[f.severity] ?? '#888'
-
-                      if (f.evidence_type === 'bbox') {
-                        const ev = f.evidence as { type: 'bbox'; x: number; y: number; width: number; height: number }
-                        const pos = scaleBox(ev)
-                        if (!pos) return null
-                        return (
-                          <div
-                            key={f.id}
-                            className="absolute cursor-pointer transition-opacity"
-                            style={{ ...pos, border: `2px solid ${color}`, opacity: isSelected ? 1 : 0.6 }}
-                            onClick={() => setSelectedFinding(f.id === selectedFinding ? null : f.id)}
-                          />
-                        )
-                      }
-                      if (f.evidence_type === 'multi_bbox') {
-                        const ev = f.evidence as { type: 'multi_bbox'; boxes: Array<{ x: number; y: number; width: number; height: number }> }
-                        return ev.boxes.map((box, i) => {
-                          const pos = scaleBox(box)
-                          if (!pos) return null
-                          return (
-                            <div
-                              key={`${f.id}-${i}`}
-                              className="absolute cursor-pointer transition-opacity"
-                              style={{ ...pos, border: `2px solid ${color}`, opacity: isSelected ? 1 : 0.6 }}
-                              onClick={() => setSelectedFinding(f.id === selectedFinding ? null : f.id)}
-                            />
-                          )
-                        })
-                      }
-                      return null
-                    })}
                   </>
                 ) : (
                   <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">
