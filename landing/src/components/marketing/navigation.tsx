@@ -22,9 +22,14 @@ export function Navigation() {
         <div className="flex items-center justify-between">
           {/* Left: Logo + Desktop Links */}
           <div className="flex items-center gap-12">
-            <div className="text-2xl tracking-tight" style={{ fontWeight: 800 }}>
+            <button
+              className={`text-2xl tracking-tight rounded ${focusRing}`}
+              style={{ fontWeight: 800 }}
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              aria-label="Back to top"
+            >
               AIDQA
-            </div>
+            </button>
 
             <div className="hidden md:flex items-center gap-8">
               {navLinks.map((link) => (
