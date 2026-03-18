@@ -1,22 +1,43 @@
+const audiences = [
+  {
+    role: "Indie hackers and solo builders",
+    description: "Using v0, Lovable, or Cursor — who can tell the output feels off but can't diagnose why.",
+    detail: "Get a prioritized fix list without hiring a designer.",
+  },
+  {
+    role: "Startup product teams",
+    description: "Generating UI quickly without strong design review processes.",
+    detail: "Catch issues before handoff, not after launch.",
+  },
+  {
+    role: "Frontend and design engineers",
+    description: "Who want objective signals before a PR ships a visual regression.",
+    detail: "Replace manual pre-release visual checks with a structured scan.",
+  },
+  {
+    role: "Design systems teams",
+    description: "Who need consistency enforcement without auditing every AI-generated screen manually.",
+    detail: "Surface component drift and token violations at scale.",
+  },
+];
+
 export function WhoItsFor() {
   return (
     <section className="py-20 md:py-32">
-      <div className="max-w-[900px] mx-auto px-6 md:px-8 text-center">
-        <h2 className="mb-8">Built for teams shipping UI fast</h2>
+      <div className="max-w-[1100px] mx-auto px-6 md:px-8">
+        <h2 className="mb-12 text-center">Built for teams shipping UI fast</h2>
 
-        <div className="space-y-4 text-left max-w-[720px] mx-auto mb-12">
-          <p className="text-lg leading-relaxed" style={{ color: "var(--text-muted)" }}>
-            <span style={{ fontWeight: 600, color: "var(--foreground)" }}>Indie hackers and solo builders</span> using v0, Lovable, or Cursor — who can tell the output is weak but can't diagnose why.
-          </p>
-          <p className="text-lg leading-relaxed" style={{ color: "var(--text-muted)" }}>
-            <span style={{ fontWeight: 600, color: "var(--foreground)" }}>Startup product teams</span> generating UI quickly without strong design review — who need guidance before handoff, not governance after the fact.
-          </p>
-          <p className="text-lg leading-relaxed" style={{ color: "var(--text-muted)" }}>
-            <span style={{ fontWeight: 600, color: "var(--foreground)" }}>Frontend and design engineers</span> who want objective signals before a pull request ships a visual regression.
-          </p>
-          <p className="text-lg leading-relaxed" style={{ color: "var(--text-muted)" }}>
-            <span style={{ fontWeight: 600, color: "var(--foreground)" }}>Design systems teams</span> who need consistency enforcement without manual audits on every generated screen.
-          </p>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {audiences.map((a) => (
+            <div
+              key={a.role}
+              className="p-6 rounded-xl bg-[var(--card)] border border-[var(--border-subtle)]"
+            >
+              <h4 className="mb-2 text-base">{a.role}</h4>
+              <p className="text-sm leading-relaxed mb-3" style={{ color: "var(--text-muted)" }}>{a.description}</p>
+              <p className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{a.detail}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>

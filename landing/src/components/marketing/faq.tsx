@@ -25,6 +25,14 @@ export function FAQ() {
       question: "Who is AIDQA for?",
       answer: "Primarily builders using AI tools to generate product UI — indie hackers, startup teams, and developers shipping fast without a dedicated design review process. Also useful for frontend engineers who want automated design QA in their pre-release workflow.",
     },
+    {
+      question: "How is this different from Lighthouse?",
+      answer: "Lighthouse checks performance, SEO, and basic accessibility (like missing alt tags). AIDQA checks design quality signals that Lighthouse doesn't touch: spacing rhythm consistency, heading hierarchy, component drift, visual alignment, WCAG contrast ratios measured against computed CSS, and touch target sizing across interactive elements.",
+    },
+    {
+      question: "What does a finding actually look like?",
+      answer: "Each finding includes: a severity level (critical / high / medium / low), the category (layout, hierarchy, accessibility, etc.), an evidence callout showing exactly where the issue appears in the screenshot, a plain-English explanation of why it matters, repair guidance, and an AI-ready fix instruction you can paste into Cursor, v0, or Lovable.",
+    },
   ];
 
   return (

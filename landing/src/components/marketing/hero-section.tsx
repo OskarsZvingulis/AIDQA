@@ -10,13 +10,16 @@ export function HeroSection() {
           {/* Left: Headline & CTAs */}
           <div>
             <p className="text-sm uppercase tracking-widest mb-4" style={{ color: "var(--text-muted)" }}>
-              Design QA for AI-generated interfaces
+              Design Intelligence Layer for AI Builders
             </p>
             <h1 className="mb-6 text-[3.5rem] md:text-[4.5rem] leading-[1.05]">
               Catch what's wrong with your AI-generated UI before users do
             </h1>
-            <p className="text-lg mb-8 leading-relaxed" style={{ color: "var(--text-muted)" }}>
-              AI builders move fast. The output often drifts — spacing breaks, hierarchy weakens, components go inconsistent. AIDQA runs automated design checks and tells you exactly what to fix.
+            <p className="text-lg mb-4 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+              AI builders move fast. The output often drifts — spacing breaks, hierarchy weakens, components go inconsistent. AIDQA measures objective design signals and tells you exactly what to fix.
+            </p>
+            <p className="text-sm mb-8 leading-relaxed" style={{ color: "var(--text-muted)" }}>
+              Not taste. Not opinion. Measurable issues: contrast ratios, spacing rhythm, alignment offsets, accessibility thresholds.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -30,7 +33,7 @@ export function HeroSection() {
                 className={`px-8 py-4 min-h-[44px] rounded-full border-2 border-[var(--foreground)] text-[var(--foreground)] hover:bg-[var(--foreground)] hover:text-[var(--background)] transition-all ${focusRing}`}
                 onClick={() => document.getElementById("demo")?.scrollIntoView({ behavior: "smooth" })}
               >
-                See a sample report
+                Watch demo
               </button>
             </div>
           </div>
@@ -47,6 +50,7 @@ export function HeroSection() {
               loop
               muted
               playsInline
+              poster="/demo-poster.png"
               className="w-full h-full object-cover pointer-events-none"
             />
             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">

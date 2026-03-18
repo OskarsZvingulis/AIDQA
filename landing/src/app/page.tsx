@@ -14,6 +14,7 @@ import { PromiseSection } from '@/components/marketing/promise-section';
 import { EarlyAccessForm } from '@/components/marketing/early-access-form';
 import { FAQ } from '@/components/marketing/faq';
 import { Footer } from '@/components/marketing/footer';
+import { PricingSection } from '@/components/marketing/pricing-section';
 
 export default function HomePage() {
   return (
@@ -28,6 +29,7 @@ export default function HomePage() {
       <WhyPeoplePay />
       <WhoItsFor />
       <DemoSection />
+      <PricingSection />
       <PromiseSection />
       <EarlyAccessForm />
       <FAQ />

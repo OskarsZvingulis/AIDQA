@@ -13,10 +13,26 @@ export function EarlyAccessForm() {
     expectations: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) throw new Error('Failed to submit');
+      setSubmitted(true);
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (submitted) {
@@ -114,11 +130,16 @@ export function EarlyAccessForm() {
             />
           </div>
 
+          {error && (
+            <p className="text-sm text-center" style={{ color: "var(--accent-orange)" }}>{error}</p>
+          )}
+
           <button
             type="submit"
-            className={`w-full px-8 py-4 min-h-[44px] rounded-full bg-[var(--accent-orange)] text-white hover:opacity-90 transition-opacity shadow-lg ${focusRing}`}
+            disabled={loading}
+            className={`w-full px-8 py-4 min-h-[44px] rounded-full bg-[var(--accent-orange)] text-white hover:opacity-90 transition-opacity shadow-lg disabled:opacity-60 ${focusRing}`}
           >
-            Request invite
+            {loading ? 'Sending…' : 'Request invite'}
           </button>
 
           <p className="text-sm text-center" style={{ color: "var(--text-muted)" }}>

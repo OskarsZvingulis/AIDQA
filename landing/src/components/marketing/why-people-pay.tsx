@@ -33,9 +33,9 @@ export function WhyPeoplePay() {
     <section className="py-20 md:py-32 bg-[var(--card)]">
       <div className="max-w-[1200px] mx-auto px-6 md:px-8">
         <div className="text-center mb-16">
-          <h2 className="mb-8">Why founders and builders pay for this</h2>
+          <h2 className="mb-8">What ships better when you add this layer</h2>
           <p className="text-xl md:text-2xl max-w-[800px] mx-auto" style={{ color: "var(--text-muted)" }}>
-            Because one "looks broken" moment can cost more than the tool.
+            One "looks broken" moment from a user costs more than the tool. Here's what AIDQA catches before it gets there.
           </p>
         </div>
 
@@ -62,8 +62,11 @@ export function WhyPeoplePay() {
         </div>
 
         <div className="text-center">
-          <p className="text-lg" style={{ color: "var(--text-muted)" }}>
+          <p className="text-lg mb-2" style={{ color: "var(--text-muted)" }}>
             <span style={{ fontWeight: 600, color: "var(--foreground)" }}>One prevented broken release pays for AIDQA.</span>
+          </p>
+          <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+            Used by indie hackers and startup teams building with v0, Lovable, and Cursor.
           </p>
         </div>
       </div>
