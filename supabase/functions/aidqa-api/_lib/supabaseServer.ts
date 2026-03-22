@@ -19,3 +19,13 @@ export async function getUserFromRequest(req: Request): Promise<string> {
   if (error || !user) throw new AuthError('Invalid token')
   return user.id
 }
+
+export async function getUserInfoFromRequest(req: Request): Promise<{ id: string; email: string | undefined }> {
+  const token = req.headers.get('Authorization')?.replace('Bearer ', '')
+  if (!token) throw new AuthError('No token')
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  if (error || !user) throw new AuthError('Invalid token')
+  return { id: user.id, email: user.email }
+}
+
+export const ADMIN_EMAILS = new Set(['oskars.zvingulis@gmail.com'])

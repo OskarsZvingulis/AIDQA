@@ -37,6 +37,18 @@ All colors MUST be HSL.
     --ring: 222.2 84% 4.9%;
 
     --radius: 0.5rem;
+    --orange: 24 95% 53%;
+
+    /* Brand palette — WCAG AA compliant */
+    --primary-brand: #0052CC;
+    --primary-brand-hover: #0041A3;
+    --accent-orange: #C25A0C;
+    --accent-orange-bg: #FF8B00;
+    --text-primary: #172B4D;
+    --text-secondary: #5A6679;
+    --background-inactive: #F4F5F7;
+    --color-white: #FFFFFF;
+    --border-color: #DFE1E6;
 
     --sidebar-background: 0 0% 98%;
 
@@ -83,6 +95,7 @@ All colors MUST be HSL.
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    --orange: 24 95% 53%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -102,4 +115,17 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Explicit placeholder color — browsers apply ~54% opacity by default which fails WCAG AA */
+  input::placeholder {
+    color: #757575;
+    opacity: 1;
+  }
+}
+
+@media print {
+  nav, .no-print { display: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: white !important; color: black !important; }
+  .print\:break-before { break-before: page; }
 }

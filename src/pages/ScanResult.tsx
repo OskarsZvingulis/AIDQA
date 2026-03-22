@@ -4,6 +4,10 @@ import NavBar from '@/components/NavBar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Share2, Copy, FileDown, Twitter, Wand2 } from 'lucide-react'
+import { toast } from 'sonner'
+import DesignPreview from '@/components/DesignPreview'
 import { getApiBaseUrl, getAuthHeaders } from '@/lib/apiBase'
 
 type Scan = {
@@ -76,11 +80,17 @@ export default function ScanResult() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (!scanId) return
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!scanId || !UUID_RE.test(scanId)) { navigate('/'); return }
 
     const fetchScan = async () => {
       const headers = await getAuthHeaders()
       const res = await fetch(`${getApiBaseUrl()}/v1/scans/${scanId}`, { headers })
+      if (res.status === 401) {
+        if (pollRef.current) clearInterval(pollRef.current)
+        navigate('/login')
+        return
+      }
       if (!res.ok) return
       const data: Scan = await res.json()
       setScan(data)
@@ -120,7 +130,21 @@ export default function ScanResult() {
       if (pollRef.current) clearInterval(pollRef.current)
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
     }
-  }, [scanId])
+  }, [scanId, navigate])
+
+  const [showPreview, setShowPreview] = useState(false)
+
+  const handleCopyLink = async () => {
+    await navigator.clipboard.writeText(window.location.href)
+    toast.success('Link copied to clipboard')
+  }
+
+  const handleShareX = () => {
+    const score = scan?.score ?? 0
+    const text = encodeURIComponent(`Just ran a design QA scan — scored ${score}/100 with ${findings.length} issue${findings.length !== 1 ? 's' : ''} found.`)
+    const url = encodeURIComponent(window.location.href)
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank')
+  }
 
   const isLoading = !scan || scan.status === 'pending' || scan.status === 'processing'
   const imageUrl = showOverlay ? artifacts.overlay_path : artifacts.normalized_path
@@ -149,9 +173,31 @@ export default function ScanResult() {
               </p>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/history')}>
-            History
-          </Button>
+          <div className="flex items-center gap-2 no-print">
+            {scan?.status === 'completed' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Share2 className="w-4 h-4 mr-1" /> Share
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => window.print()}>
+                    <FileDown className="w-4 h-4 mr-2" /> Download PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleCopyLink}>
+                    <Copy className="w-4 h-4 mr-2" /> Copy link
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleShareX}>
+                    <Twitter className="w-4 h-4 mr-2" /> Share on X
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Button variant="outline" size="sm" onClick={() => navigate('/history')}>
+              History
+            </Button>
+          </div>
         </div>
 
         {/* Loading state */}
@@ -238,6 +284,17 @@ export default function ScanResult() {
                 </Card>
               )}
 
+              {/* Preview fixed design — above findings */}
+              {findings.length > 0 && (
+                <Button
+                  className="w-full no-print"
+                  onClick={() => setShowPreview(true)}
+                >
+                  <Wand2 className="w-4 h-4 mr-2" />
+                  Preview fixed design
+                </Button>
+              )}
+
               {/* Findings */}
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -314,10 +371,21 @@ export default function ScanResult() {
                   </Card>
                 ))}
               </div>
+
             </div>
           </div>
         )}
       </main>
+
+      {scanId && (
+        <DesignPreview
+          open={showPreview}
+          onClose={() => setShowPreview(false)}
+          scanId={scanId}
+          findings={findings}
+          beforeImageUrl={artifacts.normalized_path}
+        />
+      )}
     </div>
   )
 }

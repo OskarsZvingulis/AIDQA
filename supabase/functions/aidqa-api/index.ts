@@ -6,6 +6,8 @@ import {
   handleGetFindings,
   handleGetArtifacts,
   handleDeleteScan,
+  handlePreviewScan,
+  handleGetUsage,
 } from './scan/handlers.ts'
 
 Deno.serve(async (req: Request) => {
@@ -21,6 +23,12 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ status: 'ok' }), {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
+  }
+
+  // ── Usage route ──────────────────────────────────────────────────────────────
+
+  if (path === '/v1/usage' && req.method === 'GET') {
+    return handleGetUsage(req)
   }
 
   // ── Scan routes ──────────────────────────────────────────────────────────────
@@ -45,6 +53,12 @@ Deno.serve(async (req: Request) => {
   const artifactsMatch = path.match(/^\/v1\/scans\/([^/]+)\/artifacts$/)
   if (artifactsMatch && req.method === 'GET') {
     return handleGetArtifacts(req, artifactsMatch[1])
+  }
+
+  // POST /v1/scans/:id/preview
+  const previewMatch = path.match(/^\/v1\/scans\/([^/]+)\/preview$/)
+  if (previewMatch && req.method === 'POST') {
+    return handlePreviewScan(req, previewMatch[1])
   }
 
   // GET | DELETE /v1/scans/:id

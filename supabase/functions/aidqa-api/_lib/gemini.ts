@@ -10,7 +10,7 @@ const GEMINI_URL = (model: string, key: string) =>
 function buildPrompt(deterministicFindings: Finding[]): string {
   const alreadyFound = deterministicFindings.map(f => ({ category: f.category, title: f.title }))
 
-  return `You are a senior product designer performing a design QA review.
+  return `You are a senior product designer performing a design QA review on a static UI screenshot.
 
 ## Screenshot
 The attached image is a UI screenshot at 1440px desktop width.
@@ -23,18 +23,40 @@ Return an empty array if you have no new findings to add.
 ${JSON.stringify(alreadyFound, null, 2)}
 </deterministic_findings>
 
-## Your task
-Inspect the screenshot for design quality issues NOT already listed above.
-Focus on:
-- Visual hierarchy: Is there a clear primary action? Does heading structure guide the eye?
-- Layout coherence: Does whitespace distribution and scan flow make sense?
-- UX readiness: Are obvious states missing (error, empty, loading, validation)?
-- Consistency: Anything not caught by automated checks?
-- Accessibility — look hard at these specific issues:
-  * Color contrast: Is any text difficult to read against its background? Yellow/light text on light or gradient backgrounds, low-contrast text on colored backgrounds, text over images. Flag these as severity "critical" with category "accessibility".
-  * Text over gradients: Gradient backgrounds shift color — text must be readable across the ENTIRE gradient, not just part of it. If any portion of the gradient makes the text hard to read, flag it.
-  * Small or thin text on colored backgrounds that reduces legibility.
+## Known design system — do NOT flag these as issues
+This UI uses an intentional design system. The following are correct by design:
+- Orange (#FF8B00) on the "Design QA" badge — this is a deliberate accent tag, not an error
+- Blue (#2563EB) primary CTA button — this is correct brand usage
+- Dark navy (#172B4D) for headings, medium gray (#5A6679) for secondary text — both are intentional
+- Light gray (#F9FAFB) page background with white (#FFFFFF) card surfaces — correct
 
+## NEVER flag these — they are invisible in a static screenshot
+This is a static image. The following states DO NOT appear in screenshots and therefore cannot be evaluated. Do not report findings about any of these under any circumstances — even if you think they might be missing:
+- Loading spinners, skeleton screens, progress indicators, "Scanning…" text
+- Error messages, error borders, error toasts, inline validation errors
+- Hover states, focus rings, active states
+- Form validation feedback of any kind
+- Empty states or zero-data states
+- Disabled element styling when the element is interactable in code
+
+If a finding you are drafting mentions any of the above concepts, discard it entirely.
+
+## What to check — scoped to measurable dimensions only
+Only flag issues within these dimensions, because these are the only things the scoring system measures and rewards:
+
+**accessibility** — Color contrast only. Flag text where you are HIGHLY CONFIDENT the contrast ratio is definitively below 4.5:1 for normal text or below 3:1 for large text (≥18pt or 14pt bold). Do NOT flag borderline cases. Do NOT flag text you are uncertain about. Skip it if you are not sure — a missed finding is better than a false positive that cannot be fixed.
+
+**hierarchy** — Is there a clear visual primary action? Does the heading scale (h1 > h2 > body) guide the eye in the correct order? Are competing elements of equal visual weight when one should dominate?
+
+**layout** — Whitespace imbalance visible in the screenshot (one area cramped, another excessive). Elements visually misaligned with each other. Scan path that forces the eye to jump unexpectedly.
+
+**consistency** — Interactive elements of the same type that are styled differently from each other (e.g. two buttons with different border-radius, two cards with different padding). Inconsistent spacing between repeated elements.
+
+**design_system** — Typography that clearly breaks from the established scale (e.g. body text at 10px, heading at 48px with nothing in between). Spacing values that are visually inconsistent with the rest of the layout.
+
+**ux_readiness** — ONLY: Is the primary action immediately obvious to a first-time visitor looking at this screenshot? Is the purpose of the page clear from the visible content alone? Do NOT flag any dynamic states here.
+
+## Output format
 Return ONLY a valid JSON object. No prose before or after. No comments.
 
 Allowed values:
@@ -46,7 +68,6 @@ Allowed values:
 - For evidence_type "bbox": evidence = { "x": 0, "y": 0, "width": 100, "height": 50 }
 - For evidence_type "multi_bbox": evidence = { "boxes": [{ "x": 0, "y": 0, "width": 100, "height": 50 }] }
 
-Example output format:
 {
   "findings": [
     {
@@ -56,19 +77,18 @@ Example output format:
       "evidence_type": "region",
       "evidence": { "region": "hero section" },
       "why_it_matters": "How this harms coherence, trust, usability, or clarity.",
-      "repair_guidance": "Concrete human-readable fix.",
-      "ai_fix_instruction": "Instruction a developer could paste into an AI coding tool."
+      "repair_guidance": "Concrete human-readable fix targeting something visible in the screenshot.",
+      "ai_fix_instruction": "Instruction a developer can paste into an AI coding tool to implement the fix."
     }
   ]
 }
 
 Rules:
-- Maximum 5 new findings. Return fewer if the UI is mostly sound.
-- evidence_type "explanation" means no spatial location — use this for coherence/flow issues.
-- evidence_type "region" means describe the area in words (e.g. "hero section", "navigation bar").
-- For bbox/multi_bbox: coordinates are in the 1440px screenshot coordinate space.
-- Severity "critical" only for accessibility failures or completely broken layouts.
-- Be specific. "Button has no hover state" is better than "interactive feedback missing".`
+- Maximum 5 new findings. Return fewer if the UI is mostly sound. Return an empty array if everything looks good.
+- Only report a finding if you are highly confident it is a real, visible problem in this screenshot.
+- Severity "critical" only for contrast failures that are definitively failing WCAG AA, or completely broken layouts.
+- Be specific and scoped. "Heading font size is identical to body text, creating no hierarchy" is good. "Add animations" is not.
+- Do not suggest adding new features, illustrations, or content. Only flag what is visibly broken.`
 }
 
 async function fetchWithBackoff(url: string, init: RequestInit, maxRetries = 4): Promise<Response> {
@@ -187,4 +207,84 @@ ${JSON.stringify({ findings }, null, 2)}`
     // Non-fatal — return original guidance
     return findings
   }
+}
+
+type PreviewChoices = { step1: string; step2: string; step3: string }
+
+const CHOICE_LABELS: Record<string, Record<string, string>> = {
+  step1: { minimal: 'Minimal & Clean — reduce noise, increase whitespace', bold: 'Bold & Impactful — stronger contrast, prominent CTA' },
+  step2: { contrast: 'Fix contrast only — keep palette, enforce WCAG AA', refresh: 'Refresh the palette — suggest a modern accessible color scheme' },
+  step3: { accessibility: 'Accessibility first — contrast ratios, legibility, touch targets', layout: 'Layout & hierarchy — spacing rhythm, visual flow, heading scale' },
+}
+
+export async function callGeminiDesignPreview(
+  imageSignedUrl: string,
+  findings: Finding[],
+  choices: PreviewChoices
+): Promise<{ description: string; fix_prompt: string; preview_image_bytes: null }> {
+  if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not set')
+
+  const imageResponse = await fetch(imageSignedUrl)
+  if (!imageResponse.ok) throw new Error(`Failed to fetch image: ${imageResponse.status}`)
+  const imageBytes = new Uint8Array(await imageResponse.arrayBuffer())
+  const base64Image = encodeBase64(imageBytes)
+
+  const findingSummary = findings.map((f: Finding) => `- [${f.severity}] ${f.title}: ${f.repair_guidance}`).join('\n')
+
+  const prompt = `You are a senior product designer reviewing a UI screenshot.
+
+The following design issues were found:
+${findingSummary}
+
+The user wants fixes applied with these style preferences:
+- Style direction: ${CHOICE_LABELS.step1[choices.step1]}
+- Color approach: ${CHOICE_LABELS.step2[choices.step2]}
+- Priority focus: ${CHOICE_LABELS.step3[choices.step3]}
+
+Return ONLY a valid JSON object with this structure:
+{
+  "description": "2-3 sentences explaining what was changed and why it improves the design",
+  "fix_prompt": "A complete, detailed prompt a developer can paste into v0, Cursor, or Lovable to implement all these fixes. Include specific CSS property names, example color values, and spacing amounts where applicable."
+}`
+
+  const response = await fetchWithBackoff(GEMINI_URL(MODEL, GEMINI_API_KEY), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { inlineData: { mimeType: 'image/png', data: base64Image } },
+          { text: prompt },
+        ],
+      }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+        maxOutputTokens: 4096,
+        temperature: 0.4,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Gemini preview error ${response.status}: ${errText}`)
+  }
+
+  const result = await response.json()
+  const parts: Array<{ text?: string; thought?: boolean }> = result.candidates?.[0]?.content?.parts ?? []
+  const textPart = parts.findLast((p: { text?: string; thought?: boolean }) => !p.thought && p.text)
+  const text = textPart?.text ?? ''
+
+  let description = ''
+  let fix_prompt = ''
+  try {
+    const parsed = JSON.parse(text)
+    description = parsed.description ?? ''
+    fix_prompt = parsed.fix_prompt ?? ''
+  } catch {
+    description = text.slice(0, 300)
+  }
+
+  console.log('[PREVIEW] Generated description:', description.slice(0, 100))
+  return { description, fix_prompt, preview_image_bytes: null }
 }

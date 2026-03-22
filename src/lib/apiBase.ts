@@ -6,11 +6,25 @@ export function getApiBaseUrl(): string {
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   const { supabase } = await import('./supabaseClient')
-  const { data: { session } } = await supabase.auth.getSession()
-  const headers: Record<string, string> = {}
-  if (session?.access_token) {
-    headers['Authorization'] = `Bearer ${session.access_token}`
-    headers['apikey'] = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
+  const { data: { session }, error } = await supabase.auth.getSession()
+
+  if (!session?.access_token) return {}
+
+  // Only refresh if we know for certain the token is expired (expires_at exists and is in the past)
+  const now = Math.floor(Date.now() / 1000)
+  const expiresAt = session.expires_at
+  if (expiresAt && expiresAt < now + 30) {
+    const { data: { session: refreshed }, error: refreshError } = await supabase.auth.refreshSession()
+    if (!refreshError && refreshed?.access_token) {
+      return {
+        'Authorization': `Bearer ${refreshed.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
+      }
+    }
   }
-  return headers
+
+  return {
+    'Authorization': `Bearer ${session.access_token}`,
+    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY ?? '',
+  }
 }

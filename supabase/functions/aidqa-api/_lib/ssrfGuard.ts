@@ -13,6 +13,11 @@ export function isUrlSafe(urlStr: string): boolean {
   // Block localhost variants
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return false
 
+  // Block IPv4-mapped IPv6 and link-local / unique-local IPv6
+  if (hostname.startsWith('::ffff:')) return false
+  if (/^fe80:/i.test(hostname)) return false
+  if (/^fc00:/i.test(hostname) || /^fd[0-9a-f]{2}:/i.test(hostname)) return false
+
   // Block common internal hostnames
   if (hostname.endsWith('.local') || hostname.endsWith('.internal')) return false
 
