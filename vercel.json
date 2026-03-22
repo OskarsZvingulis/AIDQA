@@ -1,6 +1,6 @@
 {
   "redirects": [
-    { "source": "/(.*)", "has": [{ "type": "host", "value": "www.app.aidesignqa.com" }], "destination": "https://app.aidesignqa.com/:path*", "permanent": true }
+    { "source": "/:path*", "has": [{ "type": "host", "value": "www.app.aidesignqa.com" }], "destination": "https://app.aidesignqa.com/:path*", "permanent": true }
   ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
