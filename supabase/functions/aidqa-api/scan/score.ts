@@ -7,7 +7,7 @@ export function calculateScore(findings: Finding[]): { overall: number; category
   const categoryDeductions: Record<string, number> = {}
   const penalizedRules = new Set<string>()
 
-  for (const finding of findings) {
+  for (const finding of findings.filter(f => f.source === 'deterministic')) {
     const ruleKey = `${finding.category}:${finding.title}`
     if (penalizedRules.has(ruleKey)) continue
 
