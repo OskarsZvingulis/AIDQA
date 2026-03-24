@@ -13,7 +13,7 @@
   --s1:  #121828;
   --s2:  #19223A;
   --brd: rgba(255,255,255,.08);
-  --or:  #F5741D;
+  --or:  #d54d27;
   --w:   #FFFFFF;
   --d1:  rgba(255,255,255,.65);
   --d2:  rgba(255,255,255,.40);
@@ -30,7 +30,7 @@ html,body{width:100%;height:100%;background:var(--bg);font-family:'Plus Jakarta 
 .scr.on{opacity:1;pointer-events:all;}
 
 /* INTRO */
-.i-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(245,116,29,.1);border:1px solid rgba(245,116,29,.22);color:var(--or);font-size:.6rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;padding:4px 12px 4px 10px;border-radius:100px;margin-bottom:24px;}
+.i-badge{display:inline-flex;align-items:center;gap:7px;background:rgba(213,77,39,.1);border:1px solid rgba(213,77,39,.22);color:var(--or);font-size:.6rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;padding:4px 12px 4px 10px;border-radius:100px;margin-bottom:24px;}
 .i-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--or);animation:bl 1.4s ease infinite;}
 @keyframes bl{0%,100%{opacity:1}50%{opacity:.18}}
 .i-h{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:clamp(1.9rem,4.8vw,3.2rem);line-height:1.04;text-align:center;max-width:560px;margin-bottom:10px;}
@@ -42,7 +42,7 @@ html,body{width:100%;height:100%;background:var(--bg);font-family:'Plus Jakarta 
 .i-rt{font-size:.72rem;color:var(--d1);line-height:1.5;font-weight:400;}
 .i-rt strong{color:var(--w);font-weight:700;}
 .go-btn{background:var(--or);color:var(--w);border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:.82rem;font-weight:700;padding:13px 40px;border-radius:100px;cursor:pointer;transition:opacity .15s,transform .15s,box-shadow .2s;}
-.go-btn:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 8px 28px rgba(245,116,29,.32);}
+.go-btn:hover{opacity:.9;transform:translateY(-1px);box-shadow:0 8px 28px rgba(213,77,39,.32);}
 
 /* ── RESULTS SCREEN ── */
 .r-kicker{font-size:.58rem;letter-spacing:.3em;text-transform:uppercase;color:var(--or);margin-bottom:12px;font-weight:700;}
@@ -54,8 +54,8 @@ html,body{width:100%;height:100%;background:var(--bg);font-family:'Plus Jakarta 
 .r-h{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:clamp(1.4rem,3.2vw,2.1rem);text-align:center;margin-bottom:8px;max-width:480px;line-height:1.1;}
 .r-msg{font-size:.8rem;color:var(--d2);text-align:center;max-width:400px;line-height:1.9;margin-bottom:24px;font-weight:400;}
 .r-cta-block{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:20px;}
-.r-cta-prize{background:var(--or);color:var(--w);font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:.78rem;letter-spacing:.04em;padding:11px 28px;border-radius:100px;box-shadow:0 6px 24px rgba(245,116,29,.35);}
-.r-cta-soft{background:rgba(245,116,29,.1);border:1px solid rgba(245,116,29,.25);color:var(--or);font-size:.7rem;font-weight:600;padding:9px 22px;border-radius:100px;letter-spacing:.03em;}
+.r-cta-prize{background:var(--or);color:var(--w);font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:.78rem;letter-spacing:.04em;padding:11px 28px;border-radius:100px;box-shadow:0 6px 24px rgba(213,77,39,.35);}
+.r-cta-soft{background:rgba(213,77,39,.1);border:1px solid rgba(213,77,39,.25);color:var(--or);font-size:.7rem;font-weight:600;padding:9px 22px;border-radius:100px;letter-spacing:.03em;}
 .r-cta-note{font-size:.6rem;color:var(--d3);letter-spacing:.05em;text-align:center;font-weight:400;}
 .r-replay{background:none;border:1px solid var(--brd);color:var(--d2);font-family:'Plus Jakarta Sans',sans-serif;font-size:.64rem;padding:8px 22px;border-radius:100px;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;font-weight:600;transition:all .15s;}
 .r-replay:hover{color:var(--w);border-color:var(--d2);}
@@ -71,7 +71,7 @@ html,body{width:100%;height:100%;background:var(--bg);font-family:'Plus Jakarta 
 .g-pip{width:18px;height:3px;border-radius:2px;background:var(--brd);transition:background .3s;}
 .g-pip.done{background:var(--or);}
 .g-pip.cur{background:var(--w);}
-.g-pts{background:rgba(245,116,29,.1);border:1px solid rgba(245,116,29,.22);color:var(--or);font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.7rem;letter-spacing:.05em;padding:4px 12px;border-radius:100px;min-width:52px;text-align:center;}
+.g-pts{background:rgba(213,77,39,.1);border:1px solid rgba(213,77,39,.22);color:var(--or);font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.7rem;letter-spacing:.05em;padding:4px 12px;border-radius:100px;min-width:52px;text-align:center;}
 .g-pts.pop{animation:pop .22s ease;}
 @keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
 
@@ -79,7 +79,7 @@ html,body{width:100%;height:100%;background:var(--bg);font-family:'Plus Jakarta 
 .g-diff{font-size:.52rem;font-weight:700;letter-spacing:.17em;text-transform:uppercase;padding:3px 9px;border-radius:100px;border:1px solid;}
 .d-easy {color:var(--gr);border-color:rgba(62,207,160,.35);background:rgba(62,207,160,.07);}
 .d-med  {color:var(--yw);border-color:rgba(245,193,56,.35);background:rgba(245,193,56,.07);}
-.d-hard {color:var(--or);border-color:rgba(245,116,29,.35);background:rgba(245,116,29,.07);}
+.d-hard {color:var(--or);border-color:rgba(213,77,39,.35);background:rgba(213,77,39,.07);}
 .d-xhard{color:var(--rd);border-color:rgba(240,64,96,.35);background:rgba(240,64,96,.07);}
 .g-cat{font-size:.52rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--d2);background:var(--s1);border:1px solid var(--brd);padding:3px 9px;border-radius:100px;}
 .g-rn{font-size:.56rem;letter-spacing:.17em;text-transform:uppercase;color:var(--d3);margin-left:auto;font-weight:500;}
@@ -95,7 +95,7 @@ html,body{width:100%;height:100%;background:var(--bg);font-family:'Plus Jakarta 
 .fw{display:flex;flex-direction:column;gap:5px;min-height:0;}
 .f-lbl{font-size:.52rem;letter-spacing:.24em;text-transform:uppercase;color:var(--d3);text-align:center;font-weight:600;}
 .frame{flex:1;border:1.5px solid var(--brd);border-radius:16px;background:var(--s1);cursor:pointer;transition:border-color .15s,transform .12s,box-shadow .18s;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:28px;position:relative;min-height:0;}
-.frame:hover:not(.locked){border-color:rgba(245,116,29,.42);transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,.5);}
+.frame:hover:not(.locked){border-color:rgba(213,77,39,.42);transform:translateY(-2px);box-shadow:0 12px 40px rgba(0,0,0,.5);}
 .frame.locked{cursor:default;}
 .frame.is-drift{border-color:var(--rd)!important;background:rgba(240,64,96,.025);}
 .frame.is-clean{border-color:var(--gr)!important;background:rgba(62,207,160,.025);}
@@ -126,32 +126,32 @@ html,body{width:100%;height:100%;background:var(--bg);font-family:'Plus Jakarta 
 .mk{width:100%;max-width:210px;display:flex;flex-direction:column;align-items:flex-start;transform:scale(2.2);transform-origin:center center;}
 .mk-hdr{display:flex;align-items:center;justify-content:space-between;width:100%;padding-bottom:9px;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:11px;}
 .mk-logo{font-family:'Plus Jakarta Sans',sans-serif;font-size:.55rem;font-weight:800;letter-spacing:.08em;}
-.mk-logo-o{color:#F5741D;}
+.mk-logo-o{color:#d54d27;}
 .mk-nav{display:flex;gap:4px;align-items:center;}
 .mk-nd{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,.2);}
 .mk-kicker{font-size:.44rem;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-bottom:5px;font-weight:600;}
 .mk-title{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;color:#fff;line-height:1.15;margin-bottom:6px;}
 .mk-body{font-size:.55rem;color:rgba(255,255,255,.42);line-height:1.65;font-weight:300;}
-.mk-btn{display:block;width:100%;background:#F5741D;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:.55rem;font-weight:700;padding:6px 0;border-radius:100px;border:none;text-align:center;cursor:default;letter-spacing:.02em;}
-.mk-pill{display:inline-flex;align-items:center;gap:4px;background:rgba(245,116,29,.12);border:1px solid rgba(245,116,29,.25);color:#F5741D;font-size:.48rem;font-weight:600;padding:2px 7px;border-radius:100px;}
+.mk-btn{display:block;width:100%;background:#d54d27;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:.55rem;font-weight:700;padding:6px 0;border-radius:100px;border:none;text-align:center;cursor:default;letter-spacing:.02em;}
+.mk-pill{display:inline-flex;align-items:center;gap:4px;background:rgba(213,77,39,.12);border:1px solid rgba(213,77,39,.25);color:#d54d27;font-size:.48rem;font-weight:600;padding:2px 7px;border-radius:100px;}
 .mk-stat-row{display:flex;gap:5px;width:100%;}
 .mk-stat{flex:1;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:7px;padding:6px 5px;display:flex;flex-direction:column;gap:2px;}
 .mk-sv{font-family:'Plus Jakarta Sans',sans-serif;color:#fff;line-height:1;}
 .mk-sl{font-size:.4rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.28);font-weight:600;}
 .mk-div{width:100%;height:1px;background:rgba(255,255,255,.07);}
 .mk-row{display:flex;align-items:center;gap:6px;width:100%;}
-.mk-icon{width:19px;height:19px;border-radius:5px;background:rgba(245,116,29,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.mk-icon svg{width:9px;height:9px;fill:none;stroke:#F5741D;stroke-width:1.8;stroke-linecap:round;}
-.mk-avatar{width:24px;height:24px;border-radius:50%;background:rgba(245,116,29,.18);display:flex;align-items:center;justify-content:center;font-size:.48rem;color:#F5741D;font-weight:800;flex-shrink:0;}
+.mk-icon{width:19px;height:19px;border-radius:5px;background:rgba(213,77,39,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mk-icon svg{width:9px;height:9px;fill:none;stroke:#d54d27;stroke-width:1.8;stroke-linecap:round;}
+.mk-avatar{width:24px;height:24px;border-radius:50%;background:rgba(213,77,39,.18);display:flex;align-items:center;justify-content:center;font-size:.48rem;color:#d54d27;font-weight:800;flex-shrink:0;}
 .mk-tag-row{display:flex;gap:3px;flex-wrap:wrap;}
 .mk-tag{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.45);font-size:.42rem;padding:1px 6px;border-radius:100px;font-weight:500;}
 .mk-toggle-row{display:flex;align-items:center;justify-content:space-between;width:100%;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);}
-.mk-toggle{width:22px;height:12px;border-radius:100px;background:#F5741D;position:relative;flex-shrink:0;}
+.mk-toggle{width:22px;height:12px;border-radius:100px;background:#d54d27;position:relative;flex-shrink:0;}
 .mk-toggle-knob{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:#fff;}
 .mk-toggle.off{background:rgba(255,255,255,.12);}
 .mk-toggle.off .mk-toggle-knob{right:auto;left:2px;}
 .mk-badge{display:inline-flex;align-items:center;gap:3px;font-size:.44rem;padding:2px 6px;border-radius:100px;font-weight:700;}
-.mk-badge-or{background:rgba(245,116,29,.15);border:1px solid rgba(245,116,29,.3);color:#F5741D;}
+.mk-badge-or{background:rgba(213,77,39,.15);border:1px solid rgba(213,77,39,.3);color:#d54d27;}
 .mk-badge-gr{background:rgba(62,207,160,.12);border:1px solid rgba(62,207,160,.3);color:#3ECFA0;}
 .mk-badge-rd{background:rgba(240,64,96,.12);border:1px solid rgba(240,64,96,.3);color:#F04060;}
 
@@ -243,9 +243,9 @@ const POOL = [
   /* 2 — EASY: Brand color shift */
   { cat:'COLOR', diff:'easy', dlbl:'Easy',
     clue:'Focus on the brand accent color.',
-    drift:'<strong>Color drift</strong> — brand orange shifted from #F5741D to #C24A0E. Lower vibrancy, weaker contrast, broken brand identity.',
+    drift:'<strong>Color drift</strong> — brand orange shifted from #d54d27 to #C24A0E. Lower vibrancy, weaker contrast, broken brand identity.',
     render: d => {
-      const c = d ? '#C24A0E' : '#F5741D';
+      const c = d ? '#C24A0E' : '#d54d27';
       return `<div class="mk" style="gap:9px">
         <div class="mk-hdr"><div class="mk-logo">AID<span style="color:${c}">QA</span></div><div class="mk-nav"><div class="mk-nd"></div><div class="mk-nd"></div></div></div>
         <div class="mk-pill" style="background:${c}18;border-color:${c}44;color:${c}">3 issues found</div>
@@ -353,7 +353,7 @@ const POOL = [
       <div class="mk-div" style="margin-top:3px"></div>
       <div style="display:flex;justify-content:space-between;width:100%;margin-top:3px">
         <div style="font-size:.48rem;color:rgba(255,255,255,.28)">Impact: Medium</div>
-        <div style="font-size:.48rem;color:#F5741D;font-weight:700">View fix →</div>
+        <div style="font-size:.48rem;color:#d54d27;font-weight:700">View fix →</div>
       </div>
     </div>`
   },
@@ -428,7 +428,7 @@ const POOL = [
       <div class="mk-title" style="font-size:.84rem">7 issues found<br>in your last build</div>
       <div class="mk-body">3 critical spacing violations and 4 hierarchy inconsistencies detected across main views.</div>
       <div style="width:100%;display:flex;justify-content:${d?'flex-end':'flex-start'};margin-top:2px">
-        <div style="background:#F5741D;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:.55rem;font-weight:700;padding:6px 14px;border-radius:100px;cursor:default">View report →</div>
+        <div style="background:#d54d27;color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-size:.55rem;font-weight:700;padding:6px 14px;border-radius:100px;cursor:default">View report →</div>
       </div>
     </div>`
   },
@@ -442,20 +442,20 @@ const POOL = [
       <div class="mk-kicker">What AIDQA checks</div>
       <div style="display:flex;flex-direction:column;gap:6px;width:100%">
         <div class="mk-row">
-          <div style="width:19px;height:19px;border-radius:5px;background:rgba(245,116,29,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="9" height="9" fill="none" stroke="#F5741D" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 9 9"><rect x="1" y="1" width="7" height="7" rx="1"/></svg>
+          <div style="width:19px;height:19px;border-radius:5px;background:rgba(213,77,39,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="9" height="9" fill="none" stroke="#d54d27" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 9 9"><rect x="1" y="1" width="7" height="7" rx="1"/></svg>
           </div>
           <div style="font-size:.55rem;color:rgba(255,255,255,.65);font-weight:400">Layout & spacing</div>
         </div>
         <div class="mk-row">
-          <div style="width:19px;height:19px;border-radius:${d?'50%':'5px'};background:rgba(245,116,29,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="9" height="9" fill="none" stroke="#F5741D" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 9 9"><polyline points="1,4.5 3.5,7 8,2"/></svg>
+          <div style="width:19px;height:19px;border-radius:${d?'50%':'5px'};background:rgba(213,77,39,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="9" height="9" fill="none" stroke="#d54d27" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 9 9"><polyline points="1,4.5 3.5,7 8,2"/></svg>
           </div>
           <div style="font-size:.55rem;color:rgba(255,255,255,.65);font-weight:400">Hierarchy & consistency</div>
         </div>
         <div class="mk-row">
-          <div style="width:19px;height:19px;border-radius:5px;background:rgba(245,116,29,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <svg width="9" height="9" fill="none" stroke="#F5741D" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 9 9"><circle cx="4.5" cy="4.5" r="3"/></svg>
+          <div style="width:19px;height:19px;border-radius:5px;background:rgba(213,77,39,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="9" height="9" fill="none" stroke="#d54d27" stroke-width="1.8" stroke-linecap="round" viewBox="0 0 9 9"><circle cx="4.5" cy="4.5" r="3"/></svg>
           </div>
           <div style="font-size:.55rem;color:rgba(255,255,255,.65);font-weight:400">Accessibility risk</div>
         </div>
@@ -555,7 +555,7 @@ function fireConfetti() {
   cnvEl.width = window.innerWidth;
   cnvEl.height = window.innerHeight;
   confetti = [];
-  const cols = ['#F5741D','#FFFFFF','#3ECFA0','#F5C138','#8BAFDC','#F04060','#A78BFA'];
+  const cols = ['#d54d27','#FFFFFF','#3ECFA0','#F5C138','#8BAFDC','#F04060','#A78BFA'];
   for (let i = 0; i < 240; i++) {
     confetti.push({
       x: Math.random() * cnvEl.width,

@@ -6,7 +6,7 @@ export function GameButton() {
       href="/aidqa-drift-game.html"
       target="_blank"
       rel="noopener noreferrer"
-      className="fixed top-4 right-4 z-40 flex items-center justify-center w-28 h-28 group"
+      className="fixed top-[76px] right-0 z-40 flex items-center justify-center w-28 h-28 group"
       aria-label="Play the game"
     >
       <img
