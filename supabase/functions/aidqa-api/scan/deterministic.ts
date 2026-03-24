@@ -330,6 +330,194 @@ function checkTypographyScale(elements: DomElement[]): Finding[] {
   return []
 }
 
+// --- New rules ---
+
+// WCAG 1.4.12: line-height must be at least 1.5× font-size for body text
+function checkLineHeight(elements: DomElement[]): Finding[] {
+  const bodyTags = new Set(['p', 'li', 'td', 'dd'])
+  const offenders: DomElement[] = []
+
+  for (const el of elements) {
+    if (!bodyTags.has(el.tag)) continue
+    if (!el.textContent.trim() || el.textContent.length < 20) continue
+
+    const fontSize = parsePx(el.computedStyles.fontSize)
+    if (fontSize < 12) continue
+
+    const lhRaw = el.computedStyles.lineHeight
+    const lineHeight = lhRaw === 'normal' ? fontSize * 1.2 : parsePx(lhRaw)
+    if (lineHeight === 0) continue
+
+    if (lineHeight / fontSize < 1.4) offenders.push(el)
+  }
+
+  if (offenders.length === 0) return []
+
+  return [{
+    category: 'accessibility',
+    severity: 'medium',
+    title: 'Body text line-height too tight — below WCAG 1.4.12',
+    evidence_type: offenders.length === 1 ? 'bbox' : 'multi_bbox',
+    evidence: offenders.length === 1
+      ? { type: 'bbox', ...offenders[0].boundingBox, label: offenders[0].tag }
+      : {
+          type: 'multi_bbox',
+          boxes: offenders.slice(0, 6).map(el => ({ ...el.boundingBox })),
+          description: `${offenders.length} text blocks with line-height below 1.4×`,
+        },
+    why_it_matters: 'Tight line-height makes paragraphs hard to read, especially for users with dyslexia or low vision. WCAG 1.4.12 requires line-height of at least 1.5× font size.',
+    repair_guidance: 'Set line-height to at least 1.5 on all paragraph and list text elements.',
+    ai_fix_instruction: 'Set line-height: 1.5 on all p, li, and td elements. Do not use "normal" — it resolves to ~1.2 which is below threshold.',
+    metric_value: 'line-height below 1.4×',
+    score_impact: -7,
+    source: 'deterministic',
+  }]
+}
+
+// Design system: too many distinct text colors = absent token discipline
+function checkColorDiversity(elements: DomElement[]): Finding[] {
+  const textTags = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'label', 'li', 'button'])
+  const colors = new Set<string>()
+
+  for (const el of elements) {
+    if (!textTags.has(el.tag)) continue
+    if (!el.textContent.trim()) continue
+    const color = el.computedStyles.color
+    if (!color || color === 'rgba(0, 0, 0, 0)') continue
+    colors.add(color)
+  }
+
+  if (colors.size <= 5) return []
+
+  return [{
+    category: 'design_system',
+    severity: 'low',
+    title: `${colors.size} distinct text colors — color system lacks discipline`,
+    evidence_type: 'metric',
+    evidence: {
+      type: 'metric',
+      measured: `${colors.size} unique text colors`,
+      threshold: '5 or fewer for a disciplined color system',
+      element: 'Text elements across the page',
+    },
+    why_it_matters: 'Too many text colors signal missing design tokens — the color palette is growing ad-hoc rather than from a defined system.',
+    repair_guidance: 'Define 4–5 semantic text color tokens (primary, secondary, muted, inverse, accent) and replace all ad-hoc color values.',
+    ai_fix_instruction: 'Consolidate all text color values into a maximum of 5 semantic tokens. Replace inline color overrides with token references.',
+    metric_value: `${colors.size} colors`,
+    score_impact: -3,
+    source: 'deterministic',
+  }]
+}
+
+// Semantic HTML: heading levels must not skip (h1 → h3 without h2 violates ARIA spec)
+function checkHeadingOrder(elements: DomElement[]): Finding[] {
+  const headingTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+  const headings = elements.filter(el => headingTags.includes(el.tag))
+  if (headings.length < 2) return []
+
+  const violations: DomElement[] = []
+  let lastLevel = 0
+
+  for (const h of headings) {
+    const level = parseInt(h.tag[1])
+    if (lastLevel > 0 && level > lastLevel + 1) violations.push(h)
+    lastLevel = level
+  }
+
+  if (violations.length === 0) return []
+
+  return [{
+    category: 'hierarchy',
+    severity: 'medium',
+    title: 'Heading levels skip — broken document hierarchy',
+    evidence_type: violations.length === 1 ? 'bbox' : 'multi_bbox',
+    evidence: violations.length === 1
+      ? { type: 'bbox', ...violations[0].boundingBox, label: violations[0].tag }
+      : {
+          type: 'multi_bbox',
+          boxes: violations.map(el => ({ ...el.boundingBox, label: el.tag })),
+          description: `${violations.length} headings that skip levels`,
+        },
+    why_it_matters: 'Skipping heading levels (e.g. h1 → h3) breaks document structure for screen readers and signals hierarchy achieved visually rather than semantically.',
+    repair_guidance: 'Ensure headings follow sequential order (h1 → h2 → h3) without skipping levels. Adjust visual size with CSS, not by skipping tags.',
+    ai_fix_instruction: 'Fix heading tags so levels increase by one at a time. Do not skip from h1 to h3 — rename the h3 to h2 and restyle if needed.',
+    score_impact: -7,
+    source: 'deterministic',
+  }]
+}
+
+// Typography: text below 12px is unreadable for most users
+function checkSmallText(elements: DomElement[]): Finding[] {
+  const textTags = new Set(['p', 'span', 'a', 'li', 'td', 'label', 'dd'])
+  const small = elements.filter(el => {
+    if (!textTags.has(el.tag)) return false
+    if (!el.textContent.trim() || el.textContent.length < 3) return false
+    const fontSize = parsePx(el.computedStyles.fontSize)
+    return fontSize > 0 && fontSize < 12
+  })
+
+  if (small.length === 0) return []
+
+  const sizes = [...new Set(small.map(el => parsePx(el.computedStyles.fontSize)))]
+
+  return [{
+    category: 'accessibility',
+    severity: 'high',
+    title: 'Text below 12px minimum readable size',
+    evidence_type: small.length === 1 ? 'bbox' : 'multi_bbox',
+    evidence: small.length === 1
+      ? { type: 'bbox', ...small[0].boundingBox, label: small[0].tag }
+      : {
+          type: 'multi_bbox',
+          boxes: small.slice(0, 6).map(el => ({ ...el.boundingBox })),
+          description: `${small.length} text elements below 12px (sizes: ${sizes.join(', ')}px)`,
+        },
+    why_it_matters: 'Text below 12px is unreadable for most users without zooming. Browser minimum and readability research both converge on 12px as the absolute floor.',
+    repair_guidance: 'Increase all visible text to at least 12px. Body text should be 14–16px.',
+    ai_fix_instruction: 'Set font-size to a minimum of 12px on all visible text elements. Set a global minimum via `body { font-size: 16px }` and avoid overriding below 12px.',
+    metric_value: `${sizes.join(', ')}px`,
+    score_impact: -12,
+    source: 'deterministic',
+  }]
+}
+
+// Font weight discipline: too many distinct weights = no type system
+function checkFontWeightDiscipline(elements: DomElement[]): Finding[] {
+  const textTags = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'label', 'li', 'button'])
+  const weights = new Set<string>()
+
+  for (const el of elements) {
+    if (!textTags.has(el.tag)) continue
+    if (!el.textContent.trim()) continue
+    const w = el.computedStyles.fontWeight
+    if (w && w !== '400' && w !== 'normal') weights.add(w)
+  }
+
+  // Add 400 back as one slot — we want total distinct weights including regular
+  const totalWeights = weights.size + 1
+
+  if (totalWeights <= 4) return []
+
+  return [{
+    category: 'design_system',
+    severity: 'low',
+    title: `${totalWeights} distinct font weights — type system is fragmented`,
+    evidence_type: 'metric',
+    evidence: {
+      type: 'metric',
+      measured: `${totalWeights} distinct font weights`,
+      threshold: '4 or fewer (regular, medium, semibold, bold)',
+      element: `Weights in use: ${['400', ...weights].join(', ')}`,
+    },
+    why_it_matters: 'Using more than 4 font weights creates visual inconsistency and signals an absent or ignored type system.',
+    repair_guidance: 'Limit font weights to 4: regular (400), medium (500), semibold (600), bold (700). Consolidate any others.',
+    ai_fix_instruction: 'Audit all font-weight values and consolidate to four: 400, 500, 600, 700. Replace any other weights with the nearest standard value.',
+    metric_value: `${totalWeights} weights`,
+    score_impact: -3,
+    source: 'deterministic',
+  }]
+}
+
 // --- Main export ---
 
 export function runAllChecks(elements: DomElement[]): Finding[] {
@@ -341,6 +529,11 @@ export function runAllChecks(elements: DomElement[]): Finding[] {
     ...checkHeadingScale(elements),
     ...checkSpacingTokens(elements),
     ...checkTypographyScale(elements),
+    ...checkLineHeight(elements),
+    ...checkColorDiversity(elements),
+    ...checkHeadingOrder(elements),
+    ...checkSmallText(elements),
+    ...checkFontWeightDiscipline(elements),
   ]
 
   // Sort by severity weight
