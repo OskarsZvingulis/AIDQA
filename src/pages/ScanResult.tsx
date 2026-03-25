@@ -207,6 +207,7 @@ export default function ScanResult() {
             <p className="text-sm text-muted-foreground">
               {scan?.status === 'processing' ? 'Analysing…' : 'Starting scan…'}
             </p>
+            <p className="text-xs text-muted-foreground/60">This can take up to 2 minutes</p>
           </div>
         )}
 
