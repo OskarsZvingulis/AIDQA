@@ -124,7 +124,7 @@ export default function ScanResult() {
         ? { ...prev, status: 'failed', error_message: 'Scan timed out. Please try again.' }
         : prev
       )
-    }, 60000)
+    }, 120000)
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
