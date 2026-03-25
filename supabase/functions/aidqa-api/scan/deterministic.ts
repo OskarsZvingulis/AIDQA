@@ -92,8 +92,10 @@ function checkContrast(elements: DomElement[]): Finding[] {
 }
 
 function checkTouchTargets(elements: DomElement[]): Finding[] {
+  // Only check elements with explicit interactive tags or ARIA roles — not cursor-inherited children
+  const INTERACTIVE_TAGS = new Set(['a', 'button', 'input', 'select', 'textarea'])
   const small = elements.filter(el =>
-    el.isInteractive &&
+    (INTERACTIVE_TAGS.has(el.tag) || !!el.role) &&
     (el.boundingBox.width < 44 || el.boundingBox.height < 44) &&
     el.boundingBox.width > 0 &&
     el.boundingBox.height > 0
